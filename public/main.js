@@ -1,4 +1,4 @@
-// PacketRush — 3D packet highway.
+// Signalro — 3D packet highway.
 // Outbound packets drive away on the left carriageway, inbound packets come
 // toward the camera on the right. Vehicle type = protocol, size = packet size.
 
@@ -75,7 +75,7 @@ function applyTheme(key) {
   scene.fog = new THREE.Fog(...env.theme.fog);
   applyFleet(env.theme.fleet || 'cars');
   currentTheme = key;
-  try { localStorage.setItem('packetrush-theme', key); } catch (_) { /* private mode */ }
+  try { localStorage.setItem('signalro-theme', key); } catch (_) { /* private mode */ }
   const sel = document.getElementById('theme');
   if (sel && sel.value !== key) sel.value = key;
 }
@@ -91,7 +91,7 @@ themeSelect.addEventListener('change', () => applyTheme(themeSelect.value));
 
 let initialTheme = new URLSearchParams(location.search).get('theme');
 if (!initialTheme) {
-  try { initialTheme = localStorage.getItem('packetrush-theme'); } catch (_) { /* private mode */ }
+  try { initialTheme = localStorage.getItem('signalro-theme'); } catch (_) { /* private mode */ }
 }
 // applyTheme(initialTheme) runs at the bottom of this module, once the fleet
 // and legend systems it touches exist.
@@ -674,7 +674,7 @@ function updateStatusUI(msg) {
     hint.textContent = state.capture === 'unavailable'
       ? 'live capture needs privileges: `sudo npm start`, or once: `sudo scripts/grant-bpf.sh`'
       : state.hosted
-        ? 'live, simulated demo · run PacketRush locally to watch your real traffic'
+        ? 'live, simulated demo · run Signalro locally to watch your real traffic'
         : (state.capture === 'connecting' ? 'server not reachable — reconnecting…' : 'demo forced on');
   } else if (state.capture === 'live') {
     elStatus.className = 'live';

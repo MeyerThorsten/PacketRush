@@ -1,4 +1,4 @@
-# PacketRush
+# Signalro
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2ea44f.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A518-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org)
@@ -16,10 +16,10 @@ Three.js and a single Node dependency.
 📋 **[Full reference →](DOCUMENTATION.md)**
 
 > The live demo runs entirely in your browser (no install, no capture server) —
-> it shows simulated traffic across all 26 scenes. Run PacketRush locally to
+> it shows simulated traffic across all 26 scenes. Run Signalro locally to
 > watch your machine's **real** packets.
 
-[![PacketRush — the default night highway (click to launch the live demo)](docs/images/night.png)](https://flint-knoll-me7j.here.now)
+[![Signalro — the default night highway (click to launch the live demo)](docs/images/night.png)](https://flint-knoll-me7j.here.now)
 
 | Protocol | Vehicle |
 | --- | --- |
@@ -160,12 +160,12 @@ verified with headless Playwright scripts during development.
 Issues and pull requests are welcome. Adding a new scene is a ~20-line theme
 spec in `public/themes.js`; adding a new fleet is a table of nine vehicle
 definitions in `public/fleets.js` — see the
-[DOCUMENTATION.md](DOCUMENTATION.md#extending-packetrush) walkthrough.
+[DOCUMENTATION.md](DOCUMENTATION.md#extending-signalro) walkthrough.
 
 ## License
 
 [MIT](LICENSE) © 2026 Thorsten Meyer.
 
-PacketRush bundles no third-party assets — every vehicle, prop, and scene is
+Signalro bundles no third-party assets — every vehicle, prop, and scene is
 procedural low-poly geometry generated at runtime. Three.js is loaded from a
 CDN at the version pinned in `public/index.html`.

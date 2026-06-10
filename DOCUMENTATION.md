@@ -1,6 +1,6 @@
-# PacketRush — Full Documentation
+# Signalro — Full Documentation
 
-PacketRush turns your machine's live network traffic into a 3D night-highway
+Signalro turns your machine's live network traffic into a 3D night-highway
 visualization: every captured packet becomes a vehicle whose **type** encodes
 the protocol, whose **size** encodes the payload length, and whose **direction
 of travel** encodes inbound vs. outbound. A connection's packets group into a
@@ -24,7 +24,7 @@ runtime.
 - [11. Capture privileges](#11-capture-privileges)
 - [12. Testing](#12-testing)
 - [13. Project structure](#13-project-structure)
-- [14. Extending PacketRush](#14-extending-packetrush)
+- [14. Extending Signalro](#14-extending-signalro)
 - [15. Performance & browser support](#15-performance--browser-support)
 - [16. License](#16-license)
 
@@ -98,11 +98,11 @@ The single source of coupling between server and client is the **packet record**
 
 ## 3. The capture pipeline
 
-PacketRush runs `tcpdump -i <iface> -n -q -l -t -U`:
+Signalro runs `tcpdump -i <iface> -n -q -l -t -U`:
 
 | flag | effect |
 |------|--------|
-| `-n` | no name resolution (PacketRush does its own, cached — see §6) |
+| `-n` | no name resolution (Signalro does its own, cached — see §6) |
 | `-q` | quiet/brief output, one concise line per packet |
 | `-l` | line-buffered stdout so packets arrive immediately |
 | `-t` | no timestamps (we don't need them) |
@@ -187,7 +187,7 @@ all fleets (a whale and a semi truck are both the green HTTPS slot).
 ## 5. Flow convoys
 
 Random chatter and a sustained download look very different on the wire, and
-PacketRush makes that visible. The server keeps a **flow table** keyed by a
+Signalro makes that visible. The server keeps a **flow table** keyed by a
 normalized 5-tuple (protocol + sorted endpoints), so both directions of a
 connection share one small integer `flow` id:
 
@@ -242,7 +242,7 @@ colours. No GLTF, no textures (except the canvas-drawn billboard/sign labels).
 **Picking.** Clicking raycasts against the instanced bodies. One subtlety worth
 knowing if you hack on this: an `InstancedMesh` whose matrices change every
 frame never recomputes its cached bounding sphere (it stays radius −1), which
-silently breaks raycasting — PacketRush assigns each body a fixed broad-phase
+silently breaks raycasting — Signalro assigns each body a fixed broad-phase
 sphere covering the whole road volume so picking works at any vehicle count.
 
 **Bobbing/hover.** Boats bob, aircraft and spacecraft hover, animals trot — each
@@ -374,7 +374,7 @@ process.)
 
 ## 11. Capture privileges
 
-Live capture needs raw-socket access. PacketRush degrades gracefully to demo
+Live capture needs raw-socket access. Signalro degrades gracefully to demo
 mode without it, but here's how to get real packets.
 
 ### macOS
@@ -421,7 +421,7 @@ scripts (drive the page, assert DOM/WebGL state, screenshot-review).
 ## 13. Project structure
 
 ```
-PacketRush/
+Signalro/
 ├── server.js              # capture, parse, classify, flow-tag, rDNS, WS broadcast, HTTP
 ├── package.json
 ├── test/
@@ -445,7 +445,7 @@ PacketRush/
 
 ---
 
-## 14. Extending PacketRush
+## 14. Extending Signalro
 
 ### Add a scene (theme)
 

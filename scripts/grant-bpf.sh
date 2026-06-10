@@ -1,5 +1,5 @@
 #!/bin/bash
-# Grant your user read/write access to /dev/bpf* so PacketRush (tcpdump) can
+# Grant your user read/write access to /dev/bpf* so Signalro (tcpdump) can
 # capture packets without sudo — the same approach Wireshark's ChmodBPF uses.
 #
 #   sudo scripts/grant-bpf.sh            # install
@@ -13,8 +13,8 @@
 set -euo pipefail
 
 GROUP=access_bpf
-PLIST=/Library/LaunchDaemons/dev.packetrush.chmodbpf.plist
-LABEL=dev.packetrush.chmodbpf
+PLIST=/Library/LaunchDaemons/dev.signalro.chmodbpf.plist
+LABEL=dev.signalro.chmodbpf
 
 [ "$(uname)" = "Darwin" ] || { echo "error: macOS only (on Linux use: sudo setcap cap_net_raw,cap_net_admin+eip \"\$(command -v tcpdump)\")" >&2; exit 1; }
 [ "${EUID}" -eq 0 ] || { echo "error: must run as root: sudo scripts/grant-bpf.sh" >&2; exit 1; }

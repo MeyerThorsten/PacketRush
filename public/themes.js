@@ -712,7 +712,7 @@ export const THEMES = {
       addBoxCity(ctx, { count: 40, near: 90, spread: 80, color: 0x1c1533, hMin: 20, hMax: 60, litColor: 0x35d2e8, litDensity: 0.5 });
       addBillboard(ctx, -(ROAD_HALF_W + 8), -50, 0.5, 'VICE', '#ff5ec8', '#1a0f2e');
       addBillboard(ctx, ROAD_HALF_W + 8, -110, -0.5, 'MALIBU', '#35d2e8', '#160d28');
-      addBillboard(ctx, -(ROAD_HALF_W + 8), -170, 0.5, 'PACKETRUSH', '#ffd24a', '#1a0f2e');
+      addBillboard(ctx, -(ROAD_HALF_W + 8), -170, 0.5, 'SIGNALRO', '#ffd24a', '#1a0f2e');
       for (let i = 0; i < 14; i++) {
         const side = ctx.rng() < 0.5 ? -1 : 1;
         addPalm(ctx, side * (ROAD_HALF_W + 3 + ctx.rng() * 4), Z_FAR + 20 + ctx.rng() * 260, 6 + ctx.rng() * 3);

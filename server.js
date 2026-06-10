@@ -1,4 +1,4 @@
-// PacketRush server: captures packets via tcpdump and streams them to the
+// Signalro server: captures packets via tcpdump and streams them to the
 // browser over WebSocket. Falls back to "capture unavailable" status when
 // tcpdump cannot open the interface (no root), letting the UI run demo mode.
 
@@ -387,7 +387,7 @@ module.exports = {
 };
 
 if (require.main === module) server.listen(PORT, () => {
-  console.log(`PacketRush running at http://localhost:${PORT}`);
+  console.log(`Signalro running at http://localhost:${PORT}`);
   console.log(`Capturing on interface ${IFACE} (override with IFACE=enX)`);
   if (process.getuid && process.getuid() !== 0) {
     if (process.platform === 'linux') {

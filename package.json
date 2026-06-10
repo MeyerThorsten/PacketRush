@@ -1,5 +1,5 @@
 {
-  "name": "packetrush",
+  "name": "signalro",
   "version": "1.0.0",
   "description": "3D network traffic visualizer — every packet becomes a vehicle on a night highway, rendered live with Three.js",
   "main": "server.js",
@@ -20,13 +20,13 @@
     "3d",
     "network-monitoring"
   ],
-  "homepage": "https://github.com/MeyerThorsten/PacketRush#readme",
+  "homepage": "https://github.com/MeyerThorsten/Signalro#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MeyerThorsten/PacketRush.git"
+    "url": "git+https://github.com/MeyerThorsten/Signalro.git"
   },
   "bugs": {
-    "url": "https://github.com/MeyerThorsten/PacketRush/issues"
+    "url": "https://github.com/MeyerThorsten/Signalro/issues"
   },
   "author": "Thorsten Meyer",
   "license": "MIT",
