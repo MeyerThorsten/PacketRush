@@ -739,6 +739,7 @@ export const THEMES = {
 
   hawaii: {
     label: 'Hawaii Coast',
+    fleet: 'convertibles',
     bg: 0xf2906c, fog: [0xf2906c, 120, 340],
     build(ctx) {
       const { ROAD_HALF_W, Z_FAR } = ctx.C;
@@ -766,6 +767,7 @@ export const THEMES = {
 
   autobahn: {
     label: 'German Autobahn',
+    fleet: 'supercars',
     bg: 0xb9c4cf, fog: [0xb9c4cf, 130, 380],
     build(ctx) {
       const { ROAD_HALF_W, Z_FAR } = ctx.C;
@@ -790,6 +792,7 @@ export const THEMES = {
 
   bigcity: {
     label: 'Vice City',
+    fleet: 'retro80s',
     bg: 0x2a1140, fog: [0x2a1140, 100, 300],
     build(ctx) {
       const { ROAD_HALF_W, Z_FAR } = ctx.C;
@@ -881,6 +884,7 @@ export const THEMES = {
 
   neon: {
     label: 'Neon Rain',
+    fleet: 'spinners',
     bg: 0x05070f, fog: [0x05070f, 60, 230],
     build(ctx) {
       addLights(ctx, { sky: 0x2a4a6e, ground: 0x05070f, hemi: 1.1, sun: 0x4a7ab8, sunInt: 0.5, sunPos: [0, 80, 20] });
@@ -916,6 +920,7 @@ export const THEMES = {
 
   snow: {
     label: 'Overlook Pass',
+    fleet: 'snowmobiles',
     bg: 0xc8d2dc, fog: [0xc8d2dc, 70, 240],
     build(ctx) {
       const { ROAD_HALF_W, Z_FAR } = ctx.C;
@@ -939,6 +944,7 @@ export const THEMES = {
 
   jungle: {
     label: 'Isla Nublar',
+    fleet: 'safari',
     bg: 0x36502e, fog: [0x36502e, 50, 200],
     build(ctx) {
       addLights(ctx, { sky: 0x9ab88a, ground: 0x1a2a16, hemi: 1.6, sun: 0xd8e8b8, sunInt: 0.7, sunPos: [20, 60, 0] });
@@ -983,6 +989,7 @@ export const THEMES = {
 
   gotham: {
     label: 'Gotham Night',
+    fleet: 'noir',
     bg: 0x05060c, fog: [0x05060c, 70, 250],
     build(ctx) {
       const { Z_FAR } = ctx.C;
@@ -1013,6 +1020,7 @@ export const THEMES = {
 
   west: {
     label: 'Once Upon a Sunset',
+    fleet: 'stagecoaches',
     bg: 0xe8743e, fog: [0xe8743e, 100, 300],
     build(ctx) {
       const { ROAD_HALF_W, Z_FAR } = ctx.C;
@@ -1500,6 +1508,7 @@ export const THEMES = {
   },
   mirrorsedge: {
     label: 'Clean Rooftops',
+    fleet: 'couriers',
     bg: 0xeef4fb, fog: [0xeef4fb, 160, 460],
     build(ctx) {
       const { ROAD_HALF_W, Z_FAR } = ctx.C;
@@ -1601,6 +1610,7 @@ export const THEMES = {
   },
   citymap: {
     label: 'City Traffic Map',
+    fleet: 'taxis',
     bg: 0x1a2230, fog: [0x1a2230, 150, 470],
     build(ctx) {
       const { ROAD_HALF_W, Z_FAR } = ctx.C;
@@ -1624,6 +1634,7 @@ export const THEMES = {
   },
   motorways: {
     label: 'Motorways',
+    fleet: 'minimal',
     bg: 0xeae4d8, fog: [0xeae4d8, 170, 480],
     build(ctx) {
       const { ROAD_HALF_W, Z_FAR } = ctx.C;
@@ -1655,6 +1666,7 @@ export const THEMES = {
   // ===== Indie art styles =====
   limbo: {
     label: 'Limbo',
+    fleet: 'silhouette',
     bg: 0x6e7378, fog: [0x6e7378, 50, 200],
     build(ctx) {
       const { ROAD_HALF_W, Z_FAR } = ctx.C;
@@ -1697,6 +1709,7 @@ export const THEMES = {
   },
   journey: {
     label: 'Dunes',
+    fleet: 'skiffs',
     bg: 0xe8a85e, fog: [0xe8a85e, 120, 400],
     build(ctx) {
       const { Z_FAR } = ctx.C;
@@ -1723,6 +1736,7 @@ export const THEMES = {
   },
   borderlands: {
     label: 'Cel Wastes',
+    fleet: 'celbuggies',
     bg: 0xe8943a, fog: [0xe8943a, 110, 340],
     build(ctx) {
       const { ROAD_HALF_W, Z_FAR } = ctx.C;
@@ -1750,6 +1764,7 @@ export const THEMES = {
   },
   monument: {
     label: 'Monument',
+    fleet: 'abstract',
     bg: 0xf0d8e0, fog: [0xf0d8e0, 140, 440],
     build(ctx) {
       const { ROAD_HALF_W, Z_FAR } = ctx.C;

@@ -278,6 +278,127 @@ function crystalPod(slot, len, speed, label, proto) {
   ], { y: 0.8, bob: 0.25, bobF: 1.6 });
 }
 
+const PROTOS = ['HTTPS', 'QUIC', 'HTTP', 'TCP', 'DNS', 'UDP', 'SSH', 'ICMP', 'OTHER'];
+const SLOTS9 = ['truck', 'sports', 'van', 'car', 'moto', 'buggy', 'suv', 'ambulance', 'bus'];
+
+// Parametric car variant: a slot-coloured body with configurable roof/height/
+// spoiler/sign/underglow — powers supercars, convertibles, taxis, noir, etc.
+function carVar(slot, len, speed, label, proto, o = {}) {
+  const c = C[slot];
+  const bodyH = o.bodyH || 0.55;
+  const cy = bodyH / 2 + 0.32;
+  const boxes = [[0, cy, 0, 1.7, bodyH, len, c]];
+  if (o.roof === 'cabin') boxes.push([0, cy + bodyH / 2 + 0.25, -len * 0.05, 1.5, 0.5, len * 0.42, GLASS]);
+  else if (o.roof === 'tall') boxes.push([0, cy + bodyH / 2 + 0.4, -len * 0.05, 1.55, 0.8, len * 0.52, GLASS]);
+  else if (o.roof === 'open') boxes.push([0, cy + bodyH / 2 + 0.15, len * 0.12, 1.4, 0.35, len * 0.26, GLASS]);
+  boxes.push(...wheels4(1.8, len, 0.5, 0x1a1410));
+  if (o.spoiler) boxes.push([0, cy + bodyH / 2 + 0.2, -len / 2 + 0.15, 1.6, 0.1, 0.45, c]);
+  if (o.sign) boxes.push([0, cy + bodyH / 2 + 0.55, 0, 0.8, 0.32, 0.4, o.sign]);
+  const glow = [
+    [-0.55, cy, len / 2 + 0.02, 0.4, 0.18, 0.06, EYE], [0.55, cy, len / 2 + 0.02, 0.4, 0.18, 0.06, EYE],
+    [-0.55, cy, -len / 2 - 0.02, 0.4, 0.16, 0.06, TAIL], [0.55, cy, -len / 2 - 0.02, 0.4, 0.16, 0.06, TAIL],
+  ];
+  if (o.underglow) glow.push([0, 0.22, 0, 1.7, 0.06, len, o.underglow]);
+  return T(label, proto, slot, speed, boxes, glow);
+}
+function carFleet(opts, names) {
+  const sp = [22, 48, 28, 32, 46, 36, 30, 38, 22];
+  const len = [5.2, 4.0, 4.4, 4.2, 2.6, 3.6, 4.6, 4.4, 7.0];
+  const F = {};
+  SLOTS9.forEach((s, i) => { F[s] = carVar(s, len[i] * (opts.lenK || 1), sp[i], names[i], PROTOS[i], opts); });
+  return F;
+}
+// Blade-Runner spinner: a hovering car with thruster glow.
+function spinner(slot, len, speed, label, proto) {
+  const c = C[slot];
+  return T(label, proto, slot, speed, [
+    [0, 1.0, 0, 1.7, 0.6, len, c],
+    [0, 1.45, -len * 0.05, 1.4, 0.5, len * 0.5, GLASS],
+    [0, 0.7, 0, 1.9, 0.18, len * 0.9, 0x14141f],
+  ], [
+    [-0.7, 0.6, 0, 0.3, 0.2, len * 0.8, c], [0.7, 0.6, 0, 0.3, 0.2, len * 0.8, c],
+    [-0.55, 1.0, len / 2 + 0.02, 0.4, 0.18, 0.06, EYE], [0.55, 1.0, len / 2 + 0.02, 0.4, 0.18, 0.06, EYE],
+  ], { y: 1.4, bob: 0.18, bobF: 1.4 });
+}
+// Snowmobile: skis + track.
+function snowmobile(slot, len, speed, label, proto) {
+  const c = C[slot];
+  return T(label, proto, slot, speed, [
+    [0, 0.55, 0, 0.9, 0.45, len, c],
+    [0, 0.95, -len * 0.1, 0.7, 0.45, len * 0.4, 0x1a1f2e],
+    [-0.45, 0.12, len * 0.4, 0.18, 0.1, 1.2, 0xdfe5ee], [0.45, 0.12, len * 0.4, 0.18, 0.1, 1.2, 0xdfe5ee],
+    [0, 0.35, -len * 0.25, 1.0, 0.4, len * 0.4, 0x14141f],
+  ], [[0, 0.6, len / 2 + 0.05, 0.3, 0.18, 0.06, EYE]]);
+}
+// Open safari jeep with a roll cage.
+function safari(slot, len, speed, label, proto) {
+  const c = C[slot];
+  return T(label, proto, slot, speed, [
+    [0, 0.7, 0, 1.8, 0.6, len, c],
+    [0, 1.5, 0, 1.7, 0.1, len * 0.7, 0x3a2e1a],
+    [-0.8, 1.1, 0, 0.1, 0.8, len * 0.7, 0x3a2e1a], [0.8, 1.1, 0, 0.1, 0.8, len * 0.7, 0x3a2e1a],
+    [0, 0.95, -len * 0.2, 0.6, 0.6, 0.6, 0x6e5a3a],
+    ...wheels4(2.0, len, 0.62, 0x1a1410),
+  ], [[-0.55, 0.7, len / 2 + 0.05, 0.4, 0.18, 0.06, EYE], [0.55, 0.7, len / 2 + 0.05, 0.4, 0.18, 0.06, EYE]]);
+}
+// Old-west stagecoach with a two-horse team.
+function stagecoach(slot, len, speed, label, proto) {
+  const c = C[slot];
+  return T(label, proto, slot, speed, [
+    [0, 1.1, -len * 0.2, 1.6, 1.3, len * 0.45, c],
+    [0, 1.9, -len * 0.2, 1.5, 0.2, len * 0.4, 0x3a2a18],
+    [0, 1.0, len * 0.35, 0.9, 1.1, 1.8, 0x6e4a30], [0, 1.0, len * 0.35 + 1.9, 0.9, 1.1, 1.8, 0x5a3e26],
+    [-0.85, 0.5, -len * 0.2, 0.18, 1.0, 1.0, 0x2a1e10], [0.85, 0.5, -len * 0.2, 0.18, 1.0, 1.0, 0x2a1e10],
+    [-0.8, 0.35, len * 0.05, 0.15, 0.7, 0.7, 0x2a1e10], [0.8, 0.35, len * 0.05, 0.15, 0.7, 0.7, 0x2a1e10],
+  ], [[0, 1.0, len / 2 + 1.0, 0.18, 0.12, 0.06, EYE]]);
+}
+// Limbo silhouette: pure black body, slot colour only as a faint light.
+function silhouetteCar(slot, len, speed, label, proto) {
+  const c = C[slot];
+  return T(label, proto, slot, speed, [
+    [0, 0.55, 0, 1.6, 0.55, len, 0x000000],
+    [0, 1.0, -len * 0.05, 1.4, 0.5, len * 0.45, 0x000000],
+    ...wheels4(1.7, len, 0.5, 0x000000),
+  ], [[-0.5, 0.55, len / 2 + 0.02, 0.34, 0.16, 0.06, c], [0.5, 0.55, len / 2 + 0.02, 0.34, 0.16, 0.06, c]]);
+}
+// Journey sand-skiff: a floating board with a cloaked rider and a scarf.
+function skiff(slot, len, speed, label, proto) {
+  const c = C[slot];
+  return T(label, proto, slot, speed, [
+    [0, 1.0, 0, 1.0, 0.18, len, c],
+    [0, 1.5, -len * 0.15, 0.6, 0.8, 0.6, 0xb86a3a],
+    [0, 2.0, -len * 0.15, 0.5, 0.3, 0.5, 0xd88a4a],
+    [0.02, 1.7, -len * 0.4, 0.06, 1.0, 1.4, 0xe8c8a0],
+  ], [[0, 0.9, 0, 1.0, 0.06, len, c]], { y: 1.2, bob: 0.3, bobF: 1.2 });
+}
+// Monument Valley floating abstract shape.
+function abstractShape(slot, len, speed, label, proto) {
+  const c = C[slot];
+  return T(label, proto, slot, speed, [
+    [0, 1.2, 0, 1.0, 1.0, 1.0, c],
+    [0, 1.9, 0, 0.6, 0.6, 0.6, 0xf0e6d2],
+    [0, 0.6, 0, 1.3, 0.2, 1.3, c],
+  ], [], { y: 0.6, bob: 0.3, bobF: 1.0 });
+}
+// Borderlands cel buggy: roll cage + big knobby wheels + ink outlines.
+function celbuggy(slot, len, speed, label, proto) {
+  const c = C[slot];
+  return T(label, proto, slot, speed, [
+    [0, 0.7, 0, 1.5, 0.5, len, c],
+    [0, 1.3, 0, 0.12, 1.0, len * 0.5, 0x120a04], [0, 1.35, 0, 1.4, 0.12, len * 0.5, 0x120a04],
+    [0, 1.0, -len * 0.2, 0.5, 0.5, 0.5, 0x2a2018],
+    ...wheels4(2.0, len, 0.7, 0x120a04),
+  ], [[-0.5, 0.7, len / 2 + 0.05, 0.35, 0.18, 0.06, EYE], [0.5, 0.7, len / 2 + 0.05, 0.35, 0.18, 0.06, EYE]]);
+}
+// Mini Motorways: ultra-minimal rounded blob, no lights.
+function minimalCar(slot, len, speed, label, proto) {
+  const c = C[slot];
+  return T(label, proto, slot, speed, [
+    [0, 0.5, 0, 1.2, 0.6, len, c],
+    [0, 0.85, 0, 1.0, 0.3, len * 0.5, c],
+  ], []);
+}
+
 export const FLEETS = {
   cars: VEHICLE_TYPES,
 
@@ -929,5 +1050,82 @@ export const FLEETS = {
     moto: crystalPod('moto', 2.0, 48, 'spark', 'DNS'), buggy: crystalPod('buggy', 2.6, 38, 'facet', 'UDP'),
     suv: crystalPod('suv', 3.2, 32, 'geode', 'SSH'), ambulance: crystalPod('ambulance', 3.0, 38, 'lumen pod', 'ICMP'),
     bus: crystalPod('bus', 5.0, 22, 'monolith', 'OTHER'),
+  },
+
+  supercars: carFleet({ roof: 'cabin', bodyH: 0.42, spoiler: true, lenK: 1.05 },
+    ['transporter', 'hypercar', 'GT wagon', 'sport sedan', 'superbike', 'hot hatch', 'grand tourer', 'pace car', 'autocoach']),
+  convertibles: carFleet({ roof: 'open', bodyH: 0.5 },
+    ['woody wagon', 'speedster', 'beach van', 'convertible', 'scooter', 'dune cabrio', 'cruiser', 'lifeguard', 'open-top bus']),
+  retro80s: carFleet({ roof: 'open', bodyH: 0.46, underglow: 0xff5ec8 },
+    ['cargo cruiser', 'testa coupe', 'party van', 'vice coupe', 'neon bike', 'beach buggy', 'lowrider', 'medic cruiser', 'disco bus']),
+  noir: carFleet({ roof: 'tall', bodyH: 0.6, lenK: 1.08 },
+    ['armored hauler', 'muscle coupe', 'blackout van', 'noir sedan', 'night bike', 'prowler', 'heavy sedan', 'medic wagon', 'transit']),
+  couriers: carFleet({ roof: 'cabin', bodyH: 0.5, lenK: 0.9 },
+    ['parcel truck', 'courier', 'delivery van', 'runner', 'dispatch bike', 'quick buggy', 'service SUV', 'medic van', 'shuttle']),
+  taxis: carFleet({ roof: 'cabin', bodyH: 0.55, sign: 0xf0c000 },
+    ['cargo cab', 'express cab', 'shuttle cab', 'taxi', 'moto cab', 'tuk-tuk', 'SUV cab', 'medi-cab', 'city bus']),
+
+  spinners: {
+    truck: spinner('truck', 5.2, 24, 'cargo spinner', 'HTTPS'), sports: spinner('sports', 3.6, 50, 'pursuit spinner', 'QUIC'),
+    van: spinner('van', 4.2, 28, 'transit spinner', 'HTTP'), car: spinner('car', 4.0, 34, 'spinner', 'TCP'),
+    moto: spinner('moto', 2.8, 48, 'jet bike', 'DNS'), buggy: spinner('buggy', 3.6, 38, 'drone car', 'UDP'),
+    suv: spinner('suv', 4.4, 30, 'enforcer', 'SSH'), ambulance: spinner('ambulance', 4.0, 38, 'medivac', 'ICMP'),
+    bus: spinner('bus', 6.2, 22, 'sky bus', 'OTHER'),
+  },
+  snowmobiles: {
+    truck: snowmobile('truck', 4.0, 22, 'snow hauler', 'HTTPS'), sports: snowmobile('sports', 2.6, 48, 'race sled', 'QUIC'),
+    van: snowmobile('van', 3.2, 28, 'supply sled', 'HTTP'), car: snowmobile('car', 2.8, 34, 'snowmobile', 'TCP'),
+    moto: snowmobile('moto', 2.0, 48, 'ski-doo', 'DNS'), buggy: snowmobile('buggy', 2.6, 38, 'trail sled', 'UDP'),
+    suv: snowmobile('suv', 3.2, 30, 'piste tracker', 'SSH'), ambulance: snowmobile('ambulance', 3.0, 38, 'ski patrol', 'ICMP'),
+    bus: snowmobile('bus', 4.6, 22, 'snowcat', 'OTHER'),
+  },
+  safari: {
+    truck: safari('truck', 4.6, 22, 'safari truck', 'HTTPS'), sports: safari('sports', 3.4, 46, 'chase jeep', 'QUIC'),
+    van: safari('van', 4.0, 28, 'tour van', 'HTTP'), car: safari('car', 3.6, 32, 'safari jeep', 'TCP'),
+    moto: safari('moto', 2.6, 46, 'trail bike', 'DNS'), buggy: safari('buggy', 3.4, 36, 'bush buggy', 'UDP'),
+    suv: safari('suv', 4.2, 30, 'ranger 4x4', 'SSH'), ambulance: safari('ambulance', 3.8, 36, 'vet jeep', 'ICMP'),
+    bus: safari('bus', 5.6, 22, 'tour bus', 'OTHER'),
+  },
+  stagecoaches: {
+    truck: stagecoach('truck', 5.0, 20, 'freight coach', 'HTTPS'), sports: stagecoach('sports', 3.6, 42, 'pony express', 'QUIC'),
+    van: stagecoach('van', 4.2, 26, 'mail coach', 'HTTP'), car: stagecoach('car', 3.8, 30, 'stagecoach', 'TCP'),
+    moto: stagecoach('moto', 3.0, 44, 'lone rider', 'DNS'), buggy: stagecoach('buggy', 3.6, 34, 'buckboard', 'UDP'),
+    suv: stagecoach('suv', 4.2, 28, 'armored coach', 'SSH'), ambulance: stagecoach('ambulance', 4.0, 32, 'doc wagon', 'ICMP'),
+    bus: stagecoach('bus', 5.6, 20, 'wagon train', 'OTHER'),
+  },
+  silhouette: {
+    truck: silhouetteCar('truck', 5.2, 22, 'hauler', 'HTTPS'), sports: silhouetteCar('sports', 4.0, 48, 'coupe', 'QUIC'),
+    van: silhouetteCar('van', 4.4, 28, 'van', 'HTTP'), car: silhouetteCar('car', 4.2, 32, 'car', 'TCP'),
+    moto: silhouetteCar('moto', 2.6, 46, 'cycle', 'DNS'), buggy: silhouetteCar('buggy', 3.6, 36, 'buggy', 'UDP'),
+    suv: silhouetteCar('suv', 4.6, 30, 'wagon', 'SSH'), ambulance: silhouetteCar('ambulance', 4.4, 38, 'ambulance', 'ICMP'),
+    bus: silhouetteCar('bus', 7.0, 22, 'bus', 'OTHER'),
+  },
+  skiffs: {
+    truck: skiff('truck', 4.4, 24, 'cargo skiff', 'HTTPS'), sports: skiff('sports', 3.0, 48, 'sand surfer', 'QUIC'),
+    van: skiff('van', 3.6, 28, 'glider', 'HTTP'), car: skiff('car', 3.2, 34, 'skiff', 'TCP'),
+    moto: skiff('moto', 2.2, 48, 'sand dart', 'DNS'), buggy: skiff('buggy', 3.0, 38, 'drifter', 'UDP'),
+    suv: skiff('suv', 3.6, 32, 'barge skiff', 'SSH'), ambulance: skiff('ambulance', 3.4, 38, 'light skiff', 'ICMP'),
+    bus: skiff('bus', 5.2, 22, 'pilgrim barge', 'OTHER'),
+  },
+  abstract: {
+    truck: abstractShape('truck', 3.0, 24, 'monolith', 'HTTPS'), sports: abstractShape('sports', 2.2, 46, 'prism', 'QUIC'),
+    van: abstractShape('van', 2.6, 28, 'cube', 'HTTP'), car: abstractShape('car', 2.4, 32, 'block', 'TCP'),
+    moto: abstractShape('moto', 1.8, 46, 'shard', 'DNS'), buggy: abstractShape('buggy', 2.2, 36, 'wedge', 'UDP'),
+    suv: abstractShape('suv', 2.6, 30, 'pillar', 'SSH'), ambulance: abstractShape('ambulance', 2.4, 38, 'beacon', 'ICMP'),
+    bus: abstractShape('bus', 3.4, 22, 'totem', 'OTHER'),
+  },
+  celbuggies: {
+    truck: celbuggy('truck', 5.0, 22, 'gun truck', 'HTTPS'), sports: celbuggy('sports', 3.4, 48, 'outrunner', 'QUIC'),
+    van: celbuggy('van', 4.0, 28, 'tech van', 'HTTP'), car: celbuggy('car', 3.6, 34, 'cel buggy', 'TCP'),
+    moto: celbuggy('moto', 2.6, 48, 'sand bike', 'DNS'), buggy: celbuggy('buggy', 3.4, 38, 'dune runner', 'UDP'),
+    suv: celbuggy('suv', 4.2, 30, 'bandit 4x4', 'SSH'), ambulance: celbuggy('ambulance', 3.8, 36, 'medkit buggy', 'ICMP'),
+    bus: celbuggy('bus', 6.0, 22, 'caravan', 'OTHER'),
+  },
+  minimal: {
+    truck: minimalCar('truck', 3.6, 22, 'long', 'HTTPS'), sports: minimalCar('sports', 2.6, 48, 'fast', 'QUIC'),
+    van: minimalCar('van', 3.0, 28, 'box', 'HTTP'), car: minimalCar('car', 2.8, 32, 'dot', 'TCP'),
+    moto: minimalCar('moto', 1.8, 46, 'mini', 'DNS'), buggy: minimalCar('buggy', 2.6, 36, 'round', 'UDP'),
+    suv: minimalCar('suv', 3.0, 30, 'chunk', 'SSH'), ambulance: minimalCar('ambulance', 2.8, 38, 'medic', 'ICMP'),
+    bus: minimalCar('bus', 4.4, 22, 'wide', 'OTHER'),
   },
 };

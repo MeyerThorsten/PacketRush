@@ -156,6 +156,9 @@ export const PROTO_TO_TYPE = {
 };
 
 function buildMerged(boxes) {
+  // A fleet vehicle may have no glow boxes; give it a degenerate tiny box so
+  // mergeGeometries always has something to merge (an empty list throws).
+  if (!boxes || boxes.length === 0) boxes = [[0, -100, 0, 0.001, 0.001, 0.001, 0x000000]];
   const geos = boxes.map(([x, y, z, w, h, l, color]) => {
     const g = new THREE.BoxGeometry(w, h, l);
     g.translate(x, y, z);
