@@ -1,0 +1,33 @@
+{
+  "comment": "Offline threat-intel / nuisance lists for client-side highlighting. Illustrative, not exhaustive — extend with your own ranges/suffixes. v4 = CIDR ranges, domains = hostname suffixes.",
+  "lists": {
+    "tor": { "label": "Tor exit", "color": "#a855f7" },
+    "tracker": { "label": "Ad/Tracker", "color": "#eab308" },
+    "malware": { "label": "Known-bad", "color": "#ef4444" },
+    "mining": { "label": "Cryptominer", "color": "#f97316" }
+  },
+  "v4": [
+    { "cidr": "171.25.193.0/24", "list": "tor" },
+    { "cidr": "185.220.100.0/22", "list": "tor" },
+    { "cidr": "185.220.101.0/24", "list": "tor" },
+    { "cidr": "204.13.164.0/24", "list": "tor" },
+    { "cidr": "192.42.116.0/22", "list": "tor" },
+    { "cidr": "45.66.33.0/24", "list": "malware" },
+    { "cidr": "194.147.140.0/24", "list": "malware" }
+  ],
+  "domains": [
+    { "suffix": "doubleclick.net", "list": "tracker" },
+    { "suffix": "googlesyndication.com", "list": "tracker" },
+    { "suffix": "google-analytics.com", "list": "tracker" },
+    { "suffix": "googletagmanager.com", "list": "tracker" },
+    { "suffix": "scorecardresearch.com", "list": "tracker" },
+    { "suffix": "adnxs.com", "list": "tracker" },
+    { "suffix": "criteo.com", "list": "tracker" },
+    { "suffix": "facebook.com", "list": "tracker" },
+    { "suffix": "amplitude.com", "list": "tracker" },
+    { "suffix": "segment.io", "list": "tracker" },
+    { "suffix": "coinhive.com", "list": "mining" },
+    { "suffix": "coin-hive.com", "list": "mining" },
+    { "suffix": "cryptoloot.pro", "list": "mining" }
+  ]
+}

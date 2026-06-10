@@ -7,7 +7,110 @@ const {
   parseLine, classify, splitHostPort, tagFlow, sweepFlows, flows,
   parseRouteGetOutput, parseIpRouteOutput,
   requestRdns, rdnsCache, knownNames, _setRdnsResolver, _rdnsStats,
+  extractSNI, hexLinesToBuffer,
+  parseLsof, parseSs,
 } = require('../server.js');
+
+// Build a minimal valid TLS ClientHello carrying the given SNI host, optionally
+// prefixed with junk bytes (to simulate link-layer + IP/TCP headers).
+function buildClientHello(host, prefix = 0) {
+  const hostBuf = Buffer.from(host, 'ascii');
+  const sniExtBody = Buffer.concat([
+    Buffer.from([0x00, hostBuf.length + 3]),       // server_name_list length
+    Buffer.from([0x00]),                            // name_type = host_name
+    Buffer.from([(hostBuf.length >> 8) & 0xff, hostBuf.length & 0xff]),
+    hostBuf,
+  ]);
+  const sniExt = Buffer.concat([
+    Buffer.from([0x00, 0x00, (sniExtBody.length >> 8) & 0xff, sniExtBody.length & 0xff]),
+    sniExtBody,
+  ]);
+  const extensions = sniExt;
+  const body = Buffer.concat([
+    Buffer.from([0x03, 0x03]),                      // client_version
+    Buffer.alloc(32, 0xab),                         // random
+    Buffer.from([0x00]),                            // session_id length 0
+    Buffer.from([0x00, 0x02, 0x00, 0x2f]),          // cipher_suites
+    Buffer.from([0x01, 0x00]),                      // compression_methods
+    Buffer.from([(extensions.length >> 8) & 0xff, extensions.length & 0xff]),
+    extensions,
+  ]);
+  const handshake = Buffer.concat([
+    Buffer.from([0x01, (body.length >> 16) & 0xff, (body.length >> 8) & 0xff, body.length & 0xff]),
+    body,
+  ]);
+  const record = Buffer.concat([
+    Buffer.from([0x16, 0x03, 0x01, (handshake.length >> 8) & 0xff, handshake.length & 0xff]),
+    handshake,
+  ]);
+  return Buffer.concat([Buffer.alloc(prefix, 0x00), record]);
+}
+
+// ---------------------------------------------------------------------------
+// TLS SNI extraction
+// ---------------------------------------------------------------------------
+test('extractSNI: pulls hostname from a ClientHello', () => {
+  assert.strictEqual(extractSNI(buildClientHello('github.com')), 'github.com');
+  assert.strictEqual(extractSNI(buildClientHello('www.cloudflare.com')), 'www.cloudflare.com');
+});
+
+test('extractSNI: finds the handshake behind link/IP/TCP headers', () => {
+  assert.strictEqual(extractSNI(buildClientHello('example.org', 54)), 'example.org');
+});
+
+test('extractSNI: returns null for non-TLS or truncated buffers', () => {
+  assert.strictEqual(extractSNI(Buffer.from('not a tls packet at all')), null);
+  assert.strictEqual(extractSNI(Buffer.alloc(0)), null);
+  assert.strictEqual(extractSNI(buildClientHello('github.com').subarray(0, 20)), null);
+});
+
+test('extractSNI: rejects a bogus (non-hostname) server_name', () => {
+  assert.strictEqual(extractSNI(buildClientHello('nodotsorgtld')), null);
+});
+
+test('hexLinesToBuffer: reassembles tcpdump -x hex lines', () => {
+  const buf = hexLinesToBuffer(['\t0x0000:  4500 0028 abcd', '\t0x0010:  00ff']);
+  assert.deepStrictEqual([...buf], [0x45, 0x00, 0x00, 0x28, 0xab, 0xcd, 0x00, 0xff]);
+});
+
+// ---------------------------------------------------------------------------
+// process / app attribution parsers
+// ---------------------------------------------------------------------------
+test('parseLsof: maps local port -> app for established and listening sockets', () => {
+  const out = [
+    'COMMAND   PID  USER   FD   TYPE DEVICE SIZE/OFF NODE NAME',
+    'Google    901  me     50u  IPv4 0x1    0t0      TCP  10.0.0.2:55123->142.250.1.1:443 (ESTABLISHED)',
+    'node      77   me     12u  IPv6 0x2    0t0      TCP  *:8090 (LISTEN)',
+    'Spotify   55   me     30u  IPv4 0x3    0t0      UDP  10.0.0.2:51999->35.1.2.3:443',
+  ].join('\n');
+  const m = parseLsof(out);
+  assert.strictEqual(m.get('55123'), 'Google');
+  assert.strictEqual(m.get('8090'), 'node');
+  assert.strictEqual(m.get('51999'), 'Spotify');
+});
+
+test('parseSs: maps local port -> app from ss -tunp output', () => {
+  const out = [
+    'tcp   ESTAB 0 0 10.0.0.2:55123 1.2.3.4:443  users:(("chrome",pid=123,fd=50))',
+    'udp   ESTAB 0 0 10.0.0.2:51999 8.8.8.8:53   users:(("systemd-resolve",pid=9,fd=12))',
+    'tcp   LISTEN 0 128 0.0.0.0:8090 0.0.0.0:*',
+  ].join('\n');
+  const m = parseSs(out);
+  assert.strictEqual(m.get('55123'), 'chrome');
+  assert.strictEqual(m.get('51999'), 'systemd-resolve');
+  assert.strictEqual(m.has('8090'), false); // no users:() = no attribution
+});
+
+test('extractSNI: works on a hex-reassembled ClientHello', () => {
+  const ch = buildClientHello('signalro.com', 14); // 14 = fake ethernet header
+  // emit as tcpdump-style hex lines
+  const lines = [];
+  for (let i = 0; i < ch.length; i += 16) {
+    const row = ch.subarray(i, i + 16).toString('hex').replace(/(..)(?=.)/g, '$1');
+    lines.push(`\t0x${i.toString(16).padStart(4, '0')}:  ${ch.subarray(i, i + 16).toString('hex')}`);
+  }
+  assert.strictEqual(extractSNI(hexLinesToBuffer(lines)), 'signalro.com');
+});
 
 // ---------------------------------------------------------------------------
 // splitHostPort

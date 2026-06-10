@@ -173,6 +173,84 @@
     }
     #tooltip .proto { font-weight: bold; letter-spacing: 1px; }
     #tooltip .dim { color: var(--dim); }
+    .tbadge { display: inline-block; margin-top: 3px; font-size: 10px; padding: 1px 6px; border-radius: 4px; letter-spacing: .3px; }
+    .tbadge.plaintext { background: rgba(251,191,36,.18); color: #fbbf24; border: 1px solid rgba(251,191,36,.4); }
+    .tbadge.risky { background: rgba(239,68,68,.18); color: #ff6b6b; border: 1px solid rgba(239,68,68,.45); }
+    .tbadge.flag { background: color-mix(in srgb, var(--bc) 18%, transparent); color: var(--bc); border: 1px solid var(--bc); }
+
+    /* search */
+    #search {
+      position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+      z-index: 15; display: flex; align-items: center; gap: 8px; padding: 7px 12px;
+    }
+    #search input {
+      font: inherit; font-size: 12px; color: var(--text); background: transparent;
+      border: none; outline: none; width: 210px;
+    }
+    #search input::placeholder { color: var(--dim); }
+    #search .mag { color: var(--dim); font-size: 12px; }
+    #search .clr { color: var(--dim); cursor: pointer; font-size: 13px; display: none; }
+    #search.has .clr { display: inline; }
+
+    /* insights panel (right) */
+    #insights {
+      position: fixed; top: 70px; right: 16px; width: 248px; z-index: 12;
+      padding: 12px 14px; max-height: calc(100vh - 160px); overflow: hidden auto;
+    }
+    #insights h2 {
+      font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--dim);
+      margin: 2px 0 8px; display: flex; justify-content: space-between; align-items: center;
+    }
+    #insights .seg { display: flex; gap: 4px; margin-bottom: 9px; }
+    #insights .seg button {
+      flex: 1; font: inherit; font-size: 10.5px; padding: 4px 0; border-radius: 5px;
+      border: 1px solid var(--border); background: rgba(40,56,96,.4); color: var(--dim); cursor: pointer;
+    }
+    #insights .seg button.on { background: rgba(125,211,252,.18); border-color: rgba(125,211,252,.5); color: var(--text); }
+    .trow { display: flex; align-items: center; gap: 7px; font-size: 11px; padding: 3px 4px; border-radius: 5px; cursor: pointer; }
+    .trow:hover { background: rgba(64,88,148,.3); }
+    .trow.sel { background: rgba(125,211,252,.16); }
+    .trow .sw { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+    .trow .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .trow .by { color: var(--dim); font-variant-numeric: tabular-nums; font-size: 10.5px; }
+    .trow .bar { height: 3px; border-radius: 2px; margin-top: 2px; }
+    .sec-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 4px; }
+    .sec-cell { text-align: center; padding: 7px 2px; border-radius: 7px; border: 1px solid var(--border); cursor: pointer; background: rgba(40,56,96,.3); }
+    .sec-cell.on { outline: 1px solid var(--green); }
+    .sec-cell .n { font-size: 17px; font-variant-numeric: tabular-nums; }
+    .sec-cell .l { font-size: 9px; letter-spacing: .5px; text-transform: uppercase; color: var(--dim); margin-top: 2px; }
+    .sec-cell.pt .n { color: #fbbf24; } .sec-cell.rk .n { color: #ff6b6b; } .sec-cell.fl .n { color: #a855f7; }
+    #insights .more { width: 100%; margin-top: 9px; font: inherit; font-size: 11px; padding: 6px 0; border-radius: 6px;
+      border: 1px solid var(--border); background: rgba(40,56,96,.4); color: var(--text); cursor: pointer; }
+    #insights .more:hover { background: rgba(64,88,148,.6); }
+    #insights .empty { color: var(--dim); font-size: 11px; padding: 6px 4px; }
+
+    /* connections overlay */
+    #conn-overlay {
+      position: fixed; inset: 0; z-index: 30; display: none;
+      background: rgba(6,9,18,.6); backdrop-filter: blur(3px);
+      align-items: center; justify-content: center;
+    }
+    #conn-overlay.open { display: flex; }
+    #conn-box { width: min(960px, 94vw); max-height: 82vh; display: flex; flex-direction: column;
+      background: var(--panel); border: 1px solid var(--border); border-radius: 12px; backdrop-filter: blur(10px); overflow: hidden; }
+    #conn-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+    #conn-head h3 { font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--text); }
+    #conn-head .x { cursor: pointer; color: var(--dim); font-size: 18px; }
+    #conn-scroll { overflow: auto; }
+    #conn-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    #conn-table th { position: sticky; top: 0; background: var(--panel-solid, #0e1530); text-align: left; padding: 7px 10px;
+      color: var(--dim); font-weight: 600; font-size: 10.5px; letter-spacing: .5px; text-transform: uppercase; cursor: pointer; white-space: nowrap; }
+    #conn-table th:hover { color: var(--text); }
+    #conn-table td { padding: 6px 10px; border-top: 1px solid rgba(96,130,200,.12); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    #conn-table tr.body:hover { background: rgba(64,88,148,.25); cursor: pointer; }
+    #conn-table td.nm { max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+    #conn-table .pdot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+    #conn-foot { padding: 9px 16px; border-top: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
+    #conn-foot button { font: inherit; font-size: 11px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
+      background: rgba(40,56,96,.5); color: var(--text); cursor: pointer; }
+    #conn-foot button:hover { background: rgba(64,88,148,.7); }
+    #conn-foot .muted { color: var(--dim); font-size: 11px; margin-left: auto; }
   </style>
 </head>
 <body>
@@ -199,6 +277,41 @@
     <button id="btn-pause">⏸ pause</button>
     <button id="btn-demo">demo traffic</button>
     <button id="btn-sound" title="engine hum follows traffic intensity">🔇 sound</button>
+  </div>
+
+  <div id="search" class="panel">
+    <span class="mag">⌕</span>
+    <input id="search-input" type="text" placeholder="search ip · host · port · app · proto…" autocomplete="off" spellcheck="false" />
+    <span class="clr" id="search-clear" title="clear">✕</span>
+  </div>
+
+  <div id="insights" class="panel">
+    <h2>Insights <span class="window" style="font-size:9px;color:var(--dim)">last 60s</span></h2>
+    <div class="seg" id="talk-seg">
+      <button data-mode="host" class="on">Hosts</button>
+      <button data-mode="org">Orgs</button>
+      <button data-mode="app">Apps</button>
+    </div>
+    <div id="talkers"></div>
+    <h2 style="margin-top:12px">Security</h2>
+    <div class="sec-grid" id="sec-grid">
+      <div class="sec-cell pt" data-sec="plaintext"><div class="n">0</div><div class="l">plaintext</div></div>
+      <div class="sec-cell rk" data-sec="risky"><div class="n">0</div><div class="l">risky</div></div>
+      <div class="sec-cell fl" data-sec="flagged"><div class="n">0</div><div class="l">flagged</div></div>
+    </div>
+    <button class="more" id="open-conn">⊞ Connections &amp; export</button>
+  </div>
+
+  <div id="conn-overlay">
+    <div id="conn-box">
+      <div id="conn-head"><h3>Live connections</h3><span class="x" id="conn-close">✕</span></div>
+      <div id="conn-scroll"><table id="conn-table"></table></div>
+      <div id="conn-foot">
+        <button id="export-csv">⤓ Export CSV</button>
+        <button id="export-pcap">⤓ Export PCAP</button>
+        <span class="muted" id="conn-count"></span>
+      </div>
+    </div>
   </div>
 
   <div id="legend" class="panel"></div>

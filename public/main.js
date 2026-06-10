@@ -162,10 +162,151 @@ function enqueuePacket(pkt) {
   stats.bytes += pkt.len || 60;
   const remote = pkt.dir === 'out' ? pkt.dst : pkt.src;
   if (remote) destBytes.set(remote, (destBytes.get(remote) || 0) + (pkt.len || 60));
+  enrichPacket(pkt, remote); // risk, blocklist flag, flow/host/app aggregation
   if (muted.has(PROTO_TO_TYPE[pkt.proto] || 'bus')) return;
   if (spawnQueue.length >= MAX_QUEUE) spawnQueue.shift();
   spawnQueue.push(pkt);
 }
+
+// ---------------------------------------------------------------------------
+// Insights: per-packet risk classification, offline blocklist matching, and
+// live flow / host / app aggregation. Powers the top-talkers panel, the
+// connections table, search, and the security counts — all client-side, so it
+// works identically for live capture and the simulated demo.
+// ---------------------------------------------------------------------------
+const nowMs = () => performance.now();
+
+// Plaintext (unencrypted) and risky service ports → a human label.
+const PLAINTEXT_PORTS = { 80: 'HTTP', 21: 'FTP', 20: 'FTP', 23: 'Telnet', 25: 'SMTP', 110: 'POP3', 143: 'IMAP', 161: 'SNMP', 389: 'LDAP', 1883: 'MQTT' };
+const RISKY_PORTS = { 23: 'Telnet', 135: 'RPC', 139: 'NetBIOS', 445: 'SMB', 3389: 'RDP', 5900: 'VNC', 3306: 'MySQL', 5432: 'Postgres', 6379: 'Redis', 27017: 'MongoDB', 11211: 'Memcached' };
+
+function classifyRisk(pkt) {
+  for (const port of [pkt.sport, pkt.dport]) {
+    if (RISKY_PORTS[port]) return { level: 'risky', label: RISKY_PORTS[port] };
+  }
+  for (const port of [pkt.sport, pkt.dport]) {
+    if (PLAINTEXT_PORTS[port]) return { level: 'plaintext', label: PLAINTEXT_PORTS[port] };
+  }
+  return null;
+}
+
+// Offline blocklist (public/blocklist.json): CIDR ranges + domain suffixes.
+let blocklist = null;
+fetch('blocklist.json')
+  .then((r) => r.json())
+  .then((d) => {
+    blocklist = {
+      lists: d.lists,
+      v4: d.v4.map(({ cidr, list }) => {
+        const [ip, b] = cidr.split('/');
+        const bits = Number(b);
+        const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
+        return { base: (ipToInt(ip) & mask) >>> 0, mask, list };
+      }),
+      domains: d.domains,
+    };
+  })
+  .catch(() => { /* highlighting just stays off without the list */ });
+
+function matchBlock(ip, name) {
+  if (!blocklist) return null;
+  if (name) {
+    for (const e of blocklist.domains) {
+      if (name === e.suffix || name.endsWith('.' + e.suffix)) return e.list;
+    }
+  }
+  if (ip && /^\d+\.\d+\.\d+\.\d+$/.test(ip)) {
+    const n = ipToInt(ip);
+    for (const e of blocklist.v4) if (((n & e.mask) >>> 0) === e.base) return e.list;
+  }
+  return null;
+}
+
+const flowStats = new Map(); // flowId -> aggregate
+const hostStats = new Map(); // remote ip -> aggregate
+const appStats = new Map();  // app name -> aggregate
+
+function enrichPacket(pkt, remote) {
+  pkt.risk = classifyRisk(pkt);
+  const name = remote ? hostNames.get(remote) : null;
+  pkt.flag = matchBlock(remote, name);
+  const bytes = pkt.len || 60;
+  const t = nowMs();
+
+  if (pkt.flow != null) {
+    let f = flowStats.get(pkt.flow);
+    if (!f) {
+      f = { id: pkt.flow, proto: pkt.proto, remote, sport: pkt.sport, dport: pkt.dport,
+            bytesIn: 0, bytesOut: 0, packets: 0, first: t, last: t, app: null, risk: null, flag: null };
+      flowStats.set(pkt.flow, f);
+    }
+    f.proto = pkt.proto; f.remote = remote; f.last = t; f.packets++;
+    if (pkt.dir === 'out') f.bytesOut += bytes; else f.bytesIn += bytes;
+    if (pkt.app) f.app = pkt.app;
+    if (pkt.risk) f.risk = pkt.risk;
+    if (pkt.flag) f.flag = pkt.flag;
+    pkt.app = pkt.app || f.app; // later packets of a flow inherit the app
+  }
+  if (remote) {
+    let h = hostStats.get(remote);
+    if (!h) { h = { ip: remote, bytes: 0, packets: 0, app: null, proto: pkt.proto, last: t, flag: null }; hostStats.set(remote, h); }
+    h.bytes += bytes; h.packets++; h.last = t; h.proto = pkt.proto;
+    if (pkt.app) h.app = pkt.app;
+    if (pkt.flag) h.flag = pkt.flag;
+  }
+  if (pkt.app) {
+    let a = appStats.get(pkt.app);
+    if (!a) { a = { app: pkt.app, bytes: 0, packets: 0, last: t }; appStats.set(pkt.app, a); }
+    a.bytes += bytes; a.packets++; a.last = t;
+  }
+}
+
+function pruneStats(t) {
+  for (const [k, f] of flowStats) if (t - f.last > 60e3) flowStats.delete(k);
+  for (const [k, h] of hostStats) if (t - h.last > 60e3) hostStats.delete(k);
+  for (const [k, a] of appStats) if (t - a.last > 60e3) appStats.delete(k);
+}
+
+function securityCounts() {
+  let plaintext = 0, risky = 0, flagged = 0;
+  for (const f of flowStats.values()) {
+    if (f.risk?.level === 'plaintext') plaintext++;
+    else if (f.risk?.level === 'risky') risky++;
+    if (f.flag) flagged++;
+  }
+  return { plaintext, risky, flagged };
+}
+
+// Highlight: a predicate over a vehicle's packet. When active, non-matching
+// vehicles are dimmed via per-instance colour (see updateVehicles).
+const highlight = { active: false, test: () => true, label: '' };
+function setHighlight(testFn, label) {
+  highlight.active = true; highlight.test = testFn; highlight.label = label || '';
+  if (typeof onHighlightChange === 'function') onHighlightChange();
+}
+function clearHighlight() {
+  highlight.active = false; highlight.label = '';
+  if (typeof onHighlightChange === 'function') onHighlightChange();
+}
+let onHighlightChange = null;
+
+// Once highlight is used we keep per-instance colours maintained every frame
+// (white when inactive) so freshly-spawned instances never render un-coloured.
+let colorsActive = false;
+const tmpColor = new THREE.Color();
+
+// Persistent threat beacons: a small spinning marker over any vehicle whose
+// packet is plaintext/risky or matches the blocklist.
+const beaconDummy = new THREE.Object3D();
+const beaconMesh = new THREE.InstancedMesh(
+  new THREE.OctahedronGeometry(0.55),
+  new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.95, fog: false }),
+  MAX_VEHICLES
+);
+beaconMesh.frustumCulled = false;
+beaconMesh.count = 0;
+scene.add(beaconMesh);
+let showBeacons = true; // toggled with the security HUD row
 
 // Per-flow lane/speed/timing so one connection's packets form a convoy:
 // same lane, same speed, spaced CONVOY_GAP apart by delaying spawns.
@@ -257,8 +398,11 @@ function updateVehicles(dt) {
 
   // Write instance matrices grouped by type
   const tSec = performance.now() / 1000;
+  const hi = highlight.active;
+  if (hi) colorsActive = true;
   const counters = {};
   for (const key of Object.keys(vehicleMeshes)) counters[key] = 0;
+  let bIdx = 0;
   for (const v of active) {
     const idx = counters[v.typeKey]++;
     instanceMap[v.typeKey][idx] = v;
@@ -270,13 +414,38 @@ function updateVehicles(dt) {
     dummy.updateMatrix();
     body.setMatrixAt(idx, dummy.matrix);
     glow.setMatrixAt(idx, dummy.matrix);
+    if (colorsActive) {
+      const on = !hi || highlight.test(v.pkt || {});
+      tmpColor.setScalar(on ? 1 : 0.1);
+      body.setColorAt(idx, tmpColor);
+      glow.setColorAt(idx, tmpColor);
+    }
+    const pk = v.pkt;
+    if (showBeacons && pk && (pk.flag || pk.risk)) {
+      const col = pk.flag ? (blocklist?.lists?.[pk.flag]?.color || '#ef4444')
+        : (pk.risk.level === 'risky' ? '#ff3b3b' : '#fbbf24');
+      beaconDummy.position.set(v.x, y + 2.8 * v.scale + Math.sin(tSec * 4 + v.phase) * 0.18, v.z);
+      beaconDummy.rotation.set(0.5, tSec * 2.2, 0);
+      beaconDummy.scale.setScalar(0.6 * v.scale);
+      beaconDummy.updateMatrix();
+      beaconMesh.setMatrixAt(bIdx, beaconDummy.matrix);
+      beaconMesh.setColorAt(bIdx, tmpColor.set(col));
+      bIdx++;
+    }
   }
+  beaconMesh.count = bIdx;
+  beaconMesh.instanceMatrix.needsUpdate = true;
+  if (beaconMesh.instanceColor) beaconMesh.instanceColor.needsUpdate = true;
   for (const key of Object.keys(vehicleMeshes)) {
     const { body, glow } = vehicleMeshes[key];
     body.count = counters[key];
     glow.count = counters[key];
     body.instanceMatrix.needsUpdate = true;
     glow.instanceMatrix.needsUpdate = true;
+    if (colorsActive) {
+      if (body.instanceColor) body.instanceColor.needsUpdate = true;
+      if (glow.instanceColor) glow.instanceColor.needsUpdate = true;
+    }
   }
 }
 
@@ -303,21 +472,32 @@ let selected = null;
 // ip -> hostname, fed by server rDNS ({type:'names'} messages)
 const hostNames = new Map();
 
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
 function fmtEndpoint(host, port) {
   if (!host) return '?';
   const name = hostNames.get(host) || host;
-  return port ? `${name}:${port}` : name;
+  return `${escapeHtml(name)}${port ? ':' + port : ''}`;
 }
 
 function showTooltip(v) {
   const def = FLEET[v.typeKey];
   const p = v.pkt || {};
   const arrow = p.dir === 'out' ? '▲ outbound' : '▼ inbound';
-  elTooltip.innerHTML =
+  let html =
     `<span class="proto" style="color:#${def.color.toString(16).padStart(6, '0')}">${def.proto}</span>` +
     ` <span class="dim">· ${def.label} · ${arrow}</span><br>` +
     `${fmtEndpoint(p.src, p.sport)} <span class="dim">→</span> ${fmtEndpoint(p.dst, p.dport)}<br>` +
     `<span class="dim">size</span> ${Math.round(p.len || 0)} bytes`;
+  if (p.app) html += `<br><span class="dim">app</span> ${escapeHtml(p.app)}`;
+  if (p.risk) html += `<br><span class="tbadge ${p.risk.level}">⚠ ${p.risk.level} · ${escapeHtml(p.risk.label)}</span>`;
+  if (p.flag) {
+    const meta = blocklist?.lists?.[p.flag];
+    html += `<br><span class="tbadge flag" style="--bc:${meta?.color || '#ef4444'}">⚑ ${escapeHtml(meta?.label || p.flag)}</span>`;
+  }
+  elTooltip.innerHTML = html;
   elTooltip.style.display = 'block';
 }
 
@@ -352,6 +532,7 @@ window.__pr = {
   pickAt, raycaster, bodyMeshes, instanceMap, active, camera, hostNames,
   applyTheme, THEMES, getTheme: () => currentTheme,
   FLEETS, getFleet: () => currentFleet, getFleetTypes: () => FLEET,
+  flowStats, hostStats, appStats, securityCounts, setHighlight, clearHighlight, highlight,
 };
 // (geo members appended after their declarations below)
 
@@ -533,9 +714,21 @@ const DEMO_NAMES = {
   '17.253.144.10': 'aads1-cdts.aaplimg.com',
   '52.84.151.9': 'server-52-84-151-9.fra56.r.cloudfront.net',
   '140.82.114.4': 'lb-140-82-114-4-iad.github.com',
+  '34.117.59.81': 'stats.g.doubleclick.net',  // tracker (blocklist)
+  '171.25.193.77': 'tor-exit-de.relayon.org', // Tor exit range (blocklist)
+  '45.66.33.12': null,                          // flagged by IP range (malware)
 };
 for (const [ip, name] of Object.entries(DEMO_NAMES)) {
-  if (!hostNames.has(ip)) hostNames.set(ip, name);
+  if (name && !hostNames.has(ip)) hostNames.set(ip, name);
+}
+
+// Plausible owning apps for demo flows, so process attribution shows in the
+// hosted demo. Deterministic per (host,proto) so a flow keeps one app.
+const DEMO_APPS = ['Google Chrome', 'Safari', 'Spotify', 'Slack', 'Dropbox', 'Mail', 'Music', 'zoom.us', 'Signalro', 'curl'];
+function demoApp(proto, host) {
+  if (proto === 'dns') return 'mDNSResponder';
+  if (proto === 'ssh') return 'ssh';
+  return DEMO_APPS[hashString((host || '') + proto) % DEMO_APPS.length];
 }
 
 function demoPorts(proto, dir) {
@@ -574,12 +767,14 @@ function generateDemoTraffic(dt) {
   if (demoBurst > 0 && Math.random() < 28 * dt) {
     demoBurst--;
     const [lo, hi] = DEMO_SIZES[demoBurstProto];
+    const burstHost = DEMO_HOSTS[hashString(demoBurstProto + demoBurstFlow) % DEMO_HOSTS.length];
     enqueuePacket({
       proto: demoBurstProto, dir: demoBurstDir,
       len: lo + Math.random() * (hi - lo),
-      src: DEMO_HOSTS[hashString(demoBurstProto + demoBurstFlow) % DEMO_HOSTS.length],
-      dst: '192.168.1.10',
+      src: demoBurstDir === 'in' ? burstHost : '192.168.1.10',
+      dst: demoBurstDir === 'in' ? '192.168.1.10' : burstHost,
       flow: demoBurstFlow,
+      app: demoApp(demoBurstProto, burstHost),
       ...demoPorts(demoBurstProto, demoBurstDir),
     });
   }
@@ -593,8 +788,29 @@ function generateDemoTraffic(dt) {
       src: dir === 'in' ? host : '192.168.1.10',
       dst: dir === 'in' ? '192.168.1.10' : host,
       flow: hashString(host + proto) % 100000,
+      app: demoApp(proto, host),
       ...demoPorts(proto, dir),
     });
+  }
+  // Occasional "interesting" traffic so security/blocklist features show in demo
+  if (Math.random() < 0.5 * dt) {
+    const roll = Math.random();
+    if (roll < 0.45) { // risky service port (+ malware IP range)
+      const [port, app] = [[3389, 'mstsc'], [445, 'smbd'], [23, 'telnet'], [5900, 'screensharingd']][Math.floor(Math.random() * 4)];
+      enqueuePacket({ proto: 'tcp', dir: 'out', len: 120 + Math.random() * 400,
+        src: '192.168.1.10', dst: '45.66.33.12', flow: nextDemoFlow++,
+        sport: 49000 + Math.floor(Math.random() * 9000), dport: port, app });
+    } else if (roll < 0.8) { // ad/tracker beacon
+      const host = '34.117.59.81';
+      enqueuePacket({ proto: 'https', dir: 'out', len: 200 + Math.random() * 300,
+        src: '192.168.1.10', dst: host, flow: hashString(host) % 100000,
+        app: 'Google Chrome', ...demoPorts('https', 'out') });
+    } else { // Tor relay
+      const host = '171.25.193.77';
+      enqueuePacket({ proto: 'tcp', dir: 'out', len: 300 + Math.random() * 600,
+        src: '192.168.1.10', dst: host, flow: hashString(host) % 100000,
+        app: 'tor', sport: 49000 + Math.floor(Math.random() * 9000), dport: 9001 });
+    }
   }
 }
 
@@ -758,6 +974,8 @@ setInterval(() => {
   }
   if (++signTick % 4 === 0) updateExitSigns();
   setAudioIntensity(pps);
+  pruneStats(performance.now());
+  if (typeof updateInsightsUI === 'function') updateInsightsUI();
 }, 500);
 
 // Legend — chips are clickable filters: click mutes/unmutes a protocol
@@ -927,6 +1145,221 @@ btnSound.addEventListener('click', () => {
   btnSound.classList.toggle('active', audio.enabled);
 });
 Object.assign(window.__pr, { audio });
+
+// ---------------------------------------------------------------------------
+// Insights UI: top-talkers panel, security summary, search, connections table,
+// and CSV/PCAP export. All driven from the client-side flow/host/app stats.
+// ---------------------------------------------------------------------------
+const elTalkers = document.getElementById('talkers');
+const elSecGrid = document.getElementById('sec-grid');
+const searchInput = document.getElementById('search-input');
+const searchBox = document.getElementById('search');
+let talkMode = 'host';
+let talkSel = null;     // `${kind}:${key}` currently highlighted
+let secFilter = null;   // 'plaintext' | 'risky' | 'flagged'
+
+function fmtBytes(b) {
+  if (b >= 1e6) return (b / 1e6).toFixed(1) + ' MB';
+  if (b >= 1e3) return (b / 1e3).toFixed(1) + ' KB';
+  return Math.round(b) + ' B';
+}
+
+document.querySelectorAll('#talk-seg button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    talkMode = btn.dataset.mode;
+    document.querySelectorAll('#talk-seg button').forEach((b) => b.classList.toggle('on', b === btn));
+    renderTalkers();
+  });
+});
+
+function topTalkers() {
+  if (talkMode === 'app') {
+    return [...appStats.values()].sort((a, b) => b.bytes - a.bytes).slice(0, 7)
+      .map((a) => ({ kind: 'app', key: a.app, label: a.app, bytes: a.bytes, color: '#7dd3fc' }));
+  }
+  if (talkMode === 'org') {
+    const orgs = new Map();
+    for (const h of hostStats.values()) {
+      const g = geoLookup(h.ip);
+      const org = g ? g.org : 'unknown network';
+      if (LOCAL_ORGS.has(org)) continue;
+      const e = orgs.get(org) || { kind: 'org', key: org, label: org, bytes: 0, color: '#a8e6ff' };
+      e.bytes += h.bytes; orgs.set(org, e);
+    }
+    return [...orgs.values()].sort((a, b) => b.bytes - a.bytes).slice(0, 7);
+  }
+  return [...hostStats.values()].sort((a, b) => b.bytes - a.bytes).slice(0, 7).map((h) => ({
+    kind: 'host', key: h.ip, label: hostNames.get(h.ip) || h.ip, bytes: h.bytes,
+    color: h.flag ? (blocklist?.lists?.[h.flag]?.color || '#ef4444') : '#7dd3fc',
+  }));
+}
+
+let talkerKeys = '';
+function renderTalkers() {
+  const rows = topTalkers();
+  if (!rows.length) { elTalkers.innerHTML = '<div class="empty">no traffic yet…</div>'; talkerKeys = ''; return; }
+  const max = Math.max(...rows.map((r) => r.bytes), 1);
+  const keys = rows.map((r) => r.kind + ':' + r.key).join('|');
+  // Update in place when the ranking set is unchanged so rows aren't detached
+  // mid-interaction (only rebuild when the top set or its order changes).
+  if (keys === talkerKeys && elTalkers.children.length === rows.length) {
+    rows.forEach((r, i) => {
+      const row = elTalkers.children[i];
+      row.querySelector('.by').textContent = fmtBytes(r.bytes);
+      const bar = row.querySelector('.bar');
+      bar.style.width = Math.round(r.bytes / max * 100) + '%'; bar.style.background = r.color;
+      row.querySelector('.sw').style.background = r.color;
+      row.classList.toggle('sel', talkSel === r.kind + ':' + r.key);
+    });
+    return;
+  }
+  talkerKeys = keys;
+  elTalkers.innerHTML = rows.map((r) => `
+    <div class="trow" data-kind="${r.kind}" data-key="${escapeHtml(r.key)}">
+      <span class="sw" style="background:${r.color}"></span>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;gap:6px"><span class="nm">${escapeHtml(r.label)}</span><span class="by">${fmtBytes(r.bytes)}</span></div>
+        <div class="bar" style="width:${Math.round(r.bytes / max * 100)}%;background:${r.color}"></div>
+      </div></div>`).join('');
+  elTalkers.querySelectorAll('.trow').forEach((row) => {
+    if (talkSel === row.dataset.kind + ':' + row.dataset.key) row.classList.add('sel');
+    row.addEventListener('click', () => highlightTalker(row.dataset.kind, row.dataset.key));
+  });
+}
+
+function highlightTalker(kind, key) {
+  if (talkSel === kind + ':' + key) { talkSel = null; clearHighlight(); renderTalkers(); return; }
+  talkSel = kind + ':' + key;
+  let test;
+  if (kind === 'app') test = (p) => p.app === key;
+  else if (kind === 'host') test = (p) => p.dst === key || p.src === key;
+  else test = (p) => { const r = p.dir === 'out' ? p.dst : p.src; const g = geoLookup(r); return !!(g && g.org === key); };
+  setHighlight(test, 'talker');
+  renderTalkers();
+}
+
+elSecGrid.querySelectorAll('.sec-cell').forEach((cell) => {
+  cell.addEventListener('click', () => toggleSec(cell.dataset.sec));
+});
+function toggleSec(kind) {
+  const cells = elSecGrid.querySelectorAll('.sec-cell');
+  if (secFilter === kind) { secFilter = null; cells.forEach((c) => c.classList.remove('on')); clearHighlight(); return; }
+  secFilter = kind;
+  cells.forEach((c) => c.classList.toggle('on', c.dataset.sec === kind));
+  let test;
+  if (kind === 'plaintext') test = (p) => p.risk?.level === 'plaintext';
+  else if (kind === 'risky') test = (p) => p.risk?.level === 'risky';
+  else test = (p) => !!p.flag;
+  setHighlight(test, 'security');
+}
+
+// search
+function applySearch() {
+  const q = searchInput.value.trim().toLowerCase();
+  searchBox.classList.toggle('has', q.length > 0);
+  if (!q) { if (highlight.label === 'search') clearHighlight(); return; }
+  setHighlight((p) => {
+    if (!p) return false;
+    const name = (p.dir === 'out' ? hostNames.get(p.dst) : hostNames.get(p.src)) || '';
+    return `${p.src} ${p.dst} ${p.sport} ${p.dport} ${p.proto} ${p.app || ''} ${name}`.toLowerCase().includes(q);
+  }, 'search');
+}
+searchInput.addEventListener('input', applySearch);
+document.getElementById('search-clear').addEventListener('click', () => { searchInput.value = ''; applySearch(); searchInput.focus(); });
+
+// keep panel selection visuals in sync if highlight is cleared elsewhere
+onHighlightChange = () => {
+  if (!highlight.active) {
+    talkSel = null; secFilter = null;
+    elSecGrid.querySelectorAll('.sec-cell.on').forEach((c) => c.classList.remove('on'));
+    elTalkers.querySelectorAll('.trow.sel').forEach((r) => r.classList.remove('sel'));
+    if (searchBox.classList.contains('has') && highlight.label !== 'search') { /* keep search box text */ }
+  }
+};
+
+// connections overlay
+const connOverlay = document.getElementById('conn-overlay');
+const connTable = document.getElementById('conn-table');
+let connOpen = false;
+let connSort = { key: 'bytes', dir: -1 };
+const CONN_COLS = [
+  { key: 'proto', label: 'Proto' }, { key: 'host', label: 'Host / IP' }, { key: 'app', label: 'App' },
+  { key: 'dport', label: 'Port' }, { key: 'bytes', label: 'Bytes' }, { key: 'packets', label: 'Pkts' },
+  { key: 'dur', label: 'Age' }, { key: 'flag', label: 'Flag' },
+];
+document.getElementById('open-conn').addEventListener('click', () => { connOpen = true; connOverlay.classList.add('open'); renderConn(); });
+document.getElementById('conn-close').addEventListener('click', closeConn);
+connOverlay.addEventListener('click', (e) => { if (e.target === connOverlay) closeConn(); });
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && connOpen) closeConn(); });
+function closeConn() { connOpen = false; connOverlay.classList.remove('open'); }
+
+function connRows() {
+  const t = nowMs();
+  return [...flowStats.values()].map((f) => ({
+    f, proto: f.proto, host: hostNames.get(f.remote) || f.remote || '?', app: f.app || '',
+    dport: f.dport || f.sport || 0, bytes: f.bytesIn + f.bytesOut, packets: f.packets,
+    dur: (t - f.first) / 1000, flag: f.flag || '', risk: f.risk,
+  }));
+}
+function renderConn() {
+  if (!connOpen) return;
+  const rows = connRows();
+  const { key, dir } = connSort;
+  rows.sort((a, b) => { const x = a[key], y = b[key]; return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y))) * dir; });
+  let html = '<thead><tr>' + CONN_COLS.map((c) => `<th data-k="${c.key}">${c.label}${connSort.key === c.key ? (dir < 0 ? ' ▾' : ' ▴') : ''}</th>`).join('') + '</tr></thead><tbody>';
+  html += rows.slice(0, 200).map((r) => {
+    const col = `#${(FLEET[PROTO_TO_TYPE[r.proto] || 'bus']?.color || 0x8899aa).toString(16).padStart(6, '0')}`;
+    const flag = r.flag ? `<span style="color:${blocklist?.lists?.[r.flag]?.color || '#ef4444'}">⚑ ${escapeHtml(blocklist?.lists?.[r.flag]?.label || r.flag)}</span>`
+      : (r.risk ? `<span style="color:${r.risk.level === 'risky' ? '#ff6b6b' : '#fbbf24'}">⚠ ${escapeHtml(r.risk.label)}</span>` : '');
+    return `<tr class="body" data-fid="${r.f.id}"><td><span class="pdot" style="background:${col}"></span>${escapeHtml(r.proto.toUpperCase())}</td>
+      <td class="nm">${escapeHtml(r.host)}</td><td>${escapeHtml(r.app)}</td><td>${r.dport || ''}</td>
+      <td>${fmtBytes(r.bytes)}</td><td>${r.packets}</td><td>${r.dur.toFixed(0)}s</td><td>${flag}</td></tr>`;
+  }).join('') + '</tbody>';
+  connTable.innerHTML = html;
+  document.getElementById('conn-count').textContent = `${rows.length} active flows`;
+  connTable.querySelectorAll('th').forEach((th) => th.addEventListener('click', () => {
+    const k = th.dataset.k; if (connSort.key === k) connSort.dir *= -1; else connSort = { key: k, dir: -1 }; renderConn();
+  }));
+  connTable.querySelectorAll('tr.body').forEach((tr) => tr.addEventListener('click', () => {
+    setHighlight((p) => p && p.flow === Number(tr.dataset.fid), 'flow'); closeConn();
+  }));
+}
+
+// export
+function csvCell(v) { const s = String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function downloadBlob(data, name, type) {
+  const url = URL.createObjectURL(new Blob([data], { type }));
+  const a = document.createElement('a'); a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+document.getElementById('export-csv').addEventListener('click', () => {
+  const t = nowMs();
+  const head = ['proto', 'remote_ip', 'host', 'app', 'sport', 'dport', 'bytes_in', 'bytes_out', 'packets', 'age_s', 'risk', 'flag'];
+  const lines = [head.join(',')];
+  for (const f of flowStats.values()) {
+    lines.push([f.proto, f.remote || '', hostNames.get(f.remote) || '', f.app || '', f.sport || '', f.dport || '',
+      f.bytesIn, f.bytesOut, f.packets, ((t - f.first) / 1000).toFixed(0), f.risk ? f.risk.level : '', f.flag || ''].map(csvCell).join(','));
+  }
+  downloadBlob(lines.join('\n'), 'signalro-flows.csv', 'text/csv');
+});
+document.getElementById('export-pcap').addEventListener('click', () => {
+  if (state.hosted || state.demo) {
+    alert('PCAP export needs the local capture server.\nRun Signalro locally (sudo npm start) — then this downloads a Wireshark-openable capture.');
+    return;
+  }
+  window.open('/export/signalro.pcap', '_blank');
+});
+
+let connTick = 0;
+function updateInsightsUI() {
+  renderTalkers();
+  const s = securityCounts();
+  const cells = elSecGrid.children;
+  cells[0].querySelector('.n').textContent = s.plaintext;
+  cells[1].querySelector('.n').textContent = s.risky;
+  cells[2].querySelector('.n').textContent = s.flagged;
+  if (connOpen && ++connTick % 3 === 0) renderConn(); // refresh table ~every 1.5s
+}
 
 // ---------------------------------------------------------------------------
 // Main loop

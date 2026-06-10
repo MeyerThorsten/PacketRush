@@ -254,6 +254,172 @@ function knownNames() {
 }
 
 // ---------------------------------------------------------------------------
+// TLS SNI: parse the Server Name from a TLS ClientHello so HTTPS/QUIC vehicles
+// show the real domain (e.g. github.com) instead of a bare IP. A secondary
+// tcpdump streams handshake bytes; the extracted name is fed into the same
+// `names` channel (SNI overrides reverse-DNS, which is a weaker guess).
+// ---------------------------------------------------------------------------
+// extractSNI(buf): scan a packet buffer for a TLS ClientHello and return the
+// server_name extension value, or null. Link-layer-agnostic (it locates the
+// handshake by signature), fully bounds-checked. Pure → unit-tested.
+function extractSNI(buf) {
+  for (let i = 0; i + 5 < buf.length; i++) {
+    // TLS record: 0x16 (handshake), 0x03 (TLS major), then ClientHello (0x01)
+    if (buf[i] !== 0x16 || buf[i + 1] !== 0x03 || buf[i + 5] !== 0x01) continue;
+    let p = i + 5 + 4;                 // skip record header (5) + handshake header (4)
+    p += 2 + 32;                       // client_version (2) + random (32)
+    if (p >= buf.length) return null;
+    p += 1 + buf[p];                   // session_id
+    if (p + 2 > buf.length) return null;
+    p += 2 + buf.readUInt16BE(p);      // cipher_suites
+    if (p + 1 > buf.length) return null;
+    p += 1 + buf[p];                   // compression_methods
+    if (p + 2 > buf.length) return null;
+    let extEnd = p + 2 + buf.readUInt16BE(p);
+    p += 2;
+    extEnd = Math.min(extEnd, buf.length);
+    while (p + 4 <= extEnd) {
+      const type = buf.readUInt16BE(p);
+      const len = buf.readUInt16BE(p + 2);
+      const body = p + 4;
+      if (type === 0x0000 && body + 5 <= buf.length) { // server_name
+        // server_name_list(2) + name_type(1=host) + host_name length(2) + host
+        const nameType = buf[body + 2];
+        const hlen = buf.readUInt16BE(body + 3);
+        const start = body + 5;
+        if (nameType === 0 && start + hlen <= buf.length) {
+          const host = buf.toString('ascii', start, start + hlen);
+          if (/^[\w.-]+\.[a-z]{2,}$/i.test(host)) return host;
+        }
+      }
+      p = body + len;
+    }
+    return null;
+  }
+  return null;
+}
+
+// Reassemble a tcpdump `-x` hex dump (one packet's "0x0000: 4500 ..." lines)
+// into a Buffer.
+function hexLinesToBuffer(hexLines) {
+  const hex = hexLines.join(' ').replace(/0x[0-9a-f]+:/gi, '').replace(/[^0-9a-f]/gi, '');
+  return Buffer.from(hex, 'hex');
+}
+
+const HEADER_RE = /^(?:IP6|IP) (\S+?) > (\S+?):/;
+let sniTcpdump = null;
+
+function startSniCapture(spawnFn = spawn) {
+  // Match TLS handshake records (first payload byte 0x16) on port 443.
+  const filter = 'tcp port 443 and (tcp[((tcp[12]&0xf0)>>2)]=22)';
+  let td;
+  try {
+    td = spawnFn('tcpdump', ['-i', IFACE, '-n', '-l', '-s', '0', '-x', filter]);
+  } catch (_) { return null; }
+  sniTcpdump = td;
+  let cur = null;           // { dstHost } for the packet being assembled
+  let hexLines = [];
+  let lineBuf = '';
+
+  const flush = () => {
+    if (cur && hexLines.length) {
+      try {
+        const sni = extractSNI(hexLinesToBuffer(hexLines));
+        if (sni && cur.dstHost && !LOCAL_ADDRS.has(cur.dstHost)) noteSni(cur.dstHost, sni);
+      } catch (_) { /* malformed dump line */ }
+    }
+    cur = null; hexLines = [];
+  };
+
+  td.stdout && td.stdout.on('data', (chunk) => {
+    lineBuf += chunk.toString();
+    const lines = lineBuf.split('\n');
+    lineBuf = lines.pop();
+    for (const line of lines) {
+      if (/^\s+0x[0-9a-f]+:/i.test(line)) { hexLines.push(line); continue; }
+      const m = HEADER_RE.exec(line.trim());
+      if (m) {
+        flush();
+        const isV6 = line.startsWith('IP6');
+        cur = { dstHost: splitHostPort(m[2], isV6).host }; // dst :443 = the server
+      }
+    }
+  });
+  td.on && td.on('error', () => {});
+  td.on && td.on('exit', () => { sniTcpdump = null; });
+  return td;
+}
+
+// SNI takes priority over reverse-DNS for the same IP.
+function noteSni(ip, name) {
+  rdnsCache.set(ip, { name, at: Date.now(), sni: true });
+  pendingNames[ip] = name;
+}
+
+// ---------------------------------------------------------------------------
+// Process / app attribution: periodically read the OS socket table and map a
+// local port to the owning application, so each packet can carry an `app`.
+// macOS/BSD: `lsof -i -n -P`. Linux: `ss -tunp`. Best-effort; needs no extra
+// privileges to see your own processes (root sees all).
+// ---------------------------------------------------------------------------
+let appMap = new Map(); // localPort(string) -> app name
+
+// lsof -i -n -P → "Chrome 123 user 50u IPv4 0x.. 0t0 TCP 10.0.0.2:55123->1.2.3.4:443 (ESTABLISHED)"
+function parseLsof(out) {
+  const map = new Map();
+  for (const line of out.split('\n')) {
+    if (!line || line.startsWith('COMMAND')) continue;
+    const cmd = line.trim().split(/\s+/)[0];
+    if (!cmd) continue;
+    // local port: before "->" (established), in a "(LISTEN)" socket, or a bare
+    // ":port" (e.g. UDP). lsof appends "(STATE)" after NAME, so match the port
+    // directly rather than taking the last token.
+    const est = line.match(/:(\d+)->/);
+    const lis = line.match(/[*\]\d.]:(\d+)\s+\(LISTEN\)/);
+    const bare = line.match(/:(\d+)(?:\s|$)/);
+    const port = (est && est[1]) || (lis && lis[1]) || (bare && bare[1]);
+    if (port) map.set(port, cmd);
+  }
+  return map;
+}
+
+// ss -tunp → "tcp ESTAB 0 0 10.0.0.2:55123 1.2.3.4:443 users:((\"chrome\",pid=123,fd=50))"
+function parseSs(out) {
+  const map = new Map();
+  for (const line of out.split('\n')) {
+    const u = line.match(/users:\(\("([^"]+)"/);
+    if (!u) continue;
+    const parts = line.trim().split(/\s+/);
+    const local = parts[4] || '';
+    const pm = local.match(/:(\d+)$/);
+    if (pm) map.set(pm[1], u[1]);
+  }
+  return map;
+}
+
+function refreshAppMap(execFn = execSync) {
+  try {
+    if (process.platform === 'linux') {
+      appMap = parseSs(execFn('ss -tunp 2>/dev/null', { encoding: 'utf8', maxBuffer: 4 << 20 }));
+    } else if (process.platform === 'win32') {
+      // Windows attribution is handled separately (netstat -ano + tasklist);
+      // left as a no-op here so the rest of the pipeline is unaffected.
+    } else {
+      appMap = parseLsof(execFn('lsof -i -n -P 2>/dev/null', { encoding: 'utf8', maxBuffer: 8 << 20 }));
+    }
+  } catch (_) { /* command missing or denied — leave previous map */ }
+}
+
+function attachApp(pkt) {
+  const localPort = LOCAL_ADDRS.has(pkt.src) ? pkt.sport : pkt.dport;
+  if (localPort != null) {
+    const app = appMap.get(String(localPort));
+    if (app) pkt.app = app;
+  }
+  return pkt;
+}
+
+// ---------------------------------------------------------------------------
 // HTTP + WebSocket server
 // ---------------------------------------------------------------------------
 const server = http.createServer((req, res) => {
@@ -313,6 +479,7 @@ setInterval(() => {
 }, 1000).unref();
 
 setInterval(sweepFlows, FLOW_SWEEP_MS).unref();
+setInterval(refreshAppMap, 3000).unref();
 
 function startCapture() {
   const args = ['-i', IFACE, '-n', '-q', '-l', '-t', '-U'];
@@ -337,7 +504,7 @@ function startCapture() {
       if (batch.length >= MAX_PACKETS_PER_BATCH) {
         droppedInBatch++;
       } else {
-        batch.push(tagFlow(pkt));
+        batch.push(attachApp(tagFlow(pkt)));
         requestRdns(pkt.dir === 'out' ? pkt.dst : pkt.src);
       }
     }
@@ -382,6 +549,8 @@ module.exports = {
   parseLine, classify, splitHostPort, tagFlow, sweepFlows, flows,
   parseRouteGetOutput, parseIpRouteOutput,
   requestRdns, rdnsCache, knownNames,
+  extractSNI, hexLinesToBuffer, startSniCapture, noteSni,
+  parseLsof, parseSs, refreshAppMap, attachApp,
   _setRdnsResolver: (fn) => { rdnsResolve = fn; },
   _rdnsStats: () => ({ active: rdnsActive, queued: rdnsQueue.length }),
 };
@@ -398,5 +567,7 @@ if (require.main === module) server.listen(PORT, () => {
       console.log('without it the browser falls back to simulated demo traffic.');
     }
   }
+  refreshAppMap();
   startCapture();
+  startSniCapture(); // best-effort; silently no-ops without capture privileges
 });
