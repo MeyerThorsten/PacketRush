@@ -16,7 +16,7 @@ Three.js and a single Node dependency.
 📋 **[Full reference →](DOCUMENTATION.md)**
 
 > The live demo runs entirely in your browser (no install, no capture server) —
-> it shows simulated traffic across all 26 scenes. Run Signalro locally to
+> it shows simulated traffic across all 52 scenes. Run Signalro locally to
 > watch your machine's **real** packets.
 
 [![Signalro — the default night highway (click to launch the live demo)](docs/images/night.png)](https://flint-knoll-me7j.here.now)
@@ -91,6 +91,21 @@ mesas), `neon` (cyberpunk rain), `grid` (cyan wireframe world), `snow`
 `shire` (green hills with round doors). Rain, snow, turbines, searchlight, and
 the station ring are animated. All scenes are procedural low-poly geometry —
 no external assets.
+
+### Game & art-style scenes
+
+A second pack of original homages to game and indie-art aesthetics (evocative
+labels, all procedural — no copied assets): `voxel`, `witcher` (Northern Path),
+`halo` (ring in the sky), `fallout` (Atomic Wastes), `battlefield` (Frontline,
+animated smoke), `nightcity` (Cyberpunk megacity), `crystal` (FF-style), `velvet`
+(Persona red/black), `mirrorsedge` (clinical white + red), `deusex` (black &
+gold), `mario` (pipes & blocks), `antigrav` (Wipeout/F-Zero, spacecraft fleet),
+`trench` (Star Wars run, spacecraft fleet), `tron` (neon freeway), `radar` (RTS
+tactical map), `citymap` (SimCity), `motorways` (Mini Motorways), `observatory`
+(cyberpunk dashboard), `limbo` (monochrome silhouettes), `cuphead` (rubber-hose),
+`okami` (ink wash), `journey` (dunes), `windwaker` (toon sea, boats fleet),
+`borderlands` (cel wastes), `monument` (Monument Valley), `hallownest` (Hollow
+Knight). **52 scenes total.**
 
 ### Fleets
 
@@ -217,7 +232,7 @@ engine, and how to add your own scene or fleet, see **[DOCUMENTATION.md](DOCUMEN
 | ![Pride Lands](docs/images/savanna.png) **Pride Lands** (animals) | ![Valley of Giants](docs/images/dino.png) **Valley of Giants** (dinosaurs) | ![Santa's Run](docs/images/christmas.png) **Santa's Run** |
 | ![Neon Rain](docs/images/neon.png) **Neon Rain** | ![The Grid](docs/images/grid.png) **The Grid** | ![Up & Away](docs/images/skyfair.png) **Up & Away** (balloons) |
 
-All 26 scenes and their fleets are catalogued in [DOCUMENTATION.md](DOCUMENTATION.md#themes--fleets).
+All 52 scenes and their fleets are catalogued in [DOCUMENTATION.md](DOCUMENTATION.md#themes--fleets).
 
 ## Testing
 

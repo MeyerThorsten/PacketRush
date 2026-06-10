@@ -632,6 +632,95 @@ function addHouse(ctx, x, z, ry = 0) {
 }
 
 // ---------------------------------------------------------------------------
+// Extra prop builders for the game / art-style scenes
+// ---------------------------------------------------------------------------
+function addVoxelTree(ctx, x, z) {
+  const h = 4 + Math.floor(ctx.rng() * 3);
+  box(ctx, 1, h, 1, 0x6b4a2b, x, h / 2, z);
+  const lc = ctx.rng() < 0.5 ? 0x3aa14a : 0x2e8b3e;
+  for (let i = 0; i < 3; i++) box(ctx, 3 - i, 1, 3 - i, lc, x, h + 0.5 + i, z);
+}
+function addPipe(ctx, x, z) {
+  const h = 3 + ctx.rng() * 3;
+  box(ctx, 2.2, h, 2.2, 0x2ea043, x, h / 2, z);
+  box(ctx, 2.7, 0.8, 2.7, 0x3fb955, x, h, z);
+}
+function addRadarGround(ctx, color) {
+  addGround(ctx, 0x04190c);
+  for (let r = 14; r < 250; r += 28) {
+    const ring = new THREE.Mesh(new THREE.RingGeometry(r, r + 0.35, 64),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.28, side: THREE.DoubleSide, fog: false }));
+    ring.rotation.x = -Math.PI / 2; ring.position.set(0, 0.02, -70);
+    ctx.g.add(ring);
+  }
+  for (let i = 0; i < 30; i++) {
+    const a = ctx.rng() * Math.PI * 2, r = 30 + ctx.rng() * 210;
+    const blip = new THREE.Mesh(new THREE.SphereGeometry(0.6, 6, 6), bmat(ctx.rng() < 0.3 ? 0xff4438 : color));
+    blip.position.set(Math.cos(a) * r, 0.5, -70 + Math.sin(a) * r);
+    ctx.g.add(blip);
+  }
+}
+function addTrenchWall(ctx, side, color) {
+  const { ROAD_HALF_W, Z_NEAR, Z_FAR } = ctx.C;
+  const L = Z_NEAR - Z_FAR + 30, zMid = (Z_NEAR + Z_FAR) / 2;
+  box(ctx, 4, 64, L, color, side * (ROAD_HALF_W + 3), 32, zMid);
+  for (let z = Z_FAR; z < Z_NEAR; z += 5) {
+    box(ctx, 1.6, 1 + ctx.rng() * 4, 2, ctx.rng() < 0.5 ? 0x3a4250 : 0x2a313c, side * (ROAD_HALF_W + 0.9), 2 + ctx.rng() * 44, z);
+    if (ctx.rng() < 0.18) box(ctx, 0.5, 0.5, 0.5, 0xffb35e, side * (ROAD_HALF_W + 0.7), 2 + ctx.rng() * 44, z, 0, true);
+  }
+}
+function addSilhouetteTree(ctx, x, z, h = 10) {
+  box(ctx, 0.5, h, 0.5, 0x000000, x, h / 2, z);
+  for (let i = 0; i < 5; i++) {
+    const a = ctx.rng() * Math.PI * 2;
+    box(ctx, 0.25, 3 + ctx.rng() * 3, 0.25, 0x000000, x + Math.cos(a) * 1.5, h * 0.7 + ctx.rng() * 2, z + Math.sin(a), a);
+  }
+}
+function addInkTree(ctx, x, z) {
+  const h = 5 + ctx.rng() * 4;
+  box(ctx, 0.35, h, 0.35, 0x1a1410, x, h / 2, z);
+  const m = mat(0x2a2018);
+  for (let i = 0; i < 4; i++) {
+    const blob = new THREE.Mesh(new THREE.SphereGeometry(1.2 + ctx.rng(), 6, 5), m);
+    blob.position.set(x + (ctx.rng() - 0.5) * 3, h + ctx.rng() * 2, z + (ctx.rng() - 0.5) * 2);
+    blob.scale.y = 0.5; ctx.g.add(blob);
+  }
+}
+function addDune(ctx, x, z, s, color = 0xd9a45e) {
+  const d = new THREE.Mesh(new THREE.SphereGeometry(20 * s, 12, 8), mat(color));
+  d.scale.y = 0.18; d.position.set(x, -2, z); ctx.g.add(d);
+}
+function addMonument(ctx, x, z, color) {
+  const h = 6 + ctx.rng() * 10;
+  box(ctx, 5, h, 5, color, x, h / 2, z);
+  box(ctx, 3, 2, 3, color, x, h + 1, z);
+  box(ctx, 2.4, 0.6, 2.4, 0xf0e6d2, x, h + 4, z); // floating slab
+}
+function addNeonArch(ctx, z, color) {
+  const { ROAD_HALF_W } = ctx.C;
+  for (const side of [-1, 1]) box(ctx, 0.4, 13, 0.4, color, side * (ROAD_HALF_W + 1), 6.5, z, 0, true);
+  box(ctx, ROAD_HALF_W * 2 + 2, 0.4, 0.4, color, 0, 13, z, 0, true);
+}
+function addHexPillar(ctx, x, z, h) {
+  const p = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, h, 6), mat(0x14110a));
+  p.position.set(x, h / 2, z); ctx.g.add(p);
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.3, 6), bmat(0xd9a521));
+  ring.position.set(x, h - 1.2, z); ctx.g.add(ring);
+}
+function addCrystal(ctx, x, z, s, color) {
+  const c = new THREE.Mesh(new THREE.OctahedronGeometry(2.4 * s),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7, fog: false }));
+  c.position.set(x, 3 * s, z); c.scale.y = 2; ctx.g.add(c);
+}
+function smokeAnimator(ctx, count = 280, color = 0x3a3a3a) {
+  const p = makeParticles(ctx, { count, color, size: 3.2, area: [260, 55, 320], opacity: 0.16 });
+  return (dt) => {
+    for (let i = 0; i < count; i++) { p.pos[i * 3 + 1] += 4 * dt; if (p.pos[i * 3 + 1] > p.area[1]) p.pos[i * 3 + 1] = 0; }
+    p.geo.attributes.position.needsUpdate = true;
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Themes
 // ---------------------------------------------------------------------------
 export const THEMES = {
@@ -1273,6 +1362,373 @@ export const THEMES = {
       addCloud(ctx, -50, 55, -220, 1.8);
       addCloud(ctx, 60, 62, -250, 2.2);
       addCloud(ctx, 10, 58, -180, 1.3);
+    },
+  },
+
+  // ===== Game worlds =====
+  voxel: {
+    label: 'Voxel World',
+    bg: 0x88c8ff, fog: [0x88c8ff, 150, 430],
+    build(ctx) {
+      const { ROAD_HALF_W, Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0xeaf6ff, ground: 0x5a8a3a, hemi: 2.2, sun: 0xfff6d0, sunInt: 1.1, sunPos: [60, 70, 30] });
+      addGround(ctx, 0x4e9b3e);
+      addRoad(ctx, { asphalt: 0x8a8a8a, dash: 0xdedede, edge: 0xcfcfcf, median: null, rail: 0x5a4a32 });
+      for (let i = 0; i < 40; i++) addVoxelTree(ctx, (ctx.rng() < 0.5 ? -1 : 1) * (ROAD_HALF_W + 6 + ctx.rng() * 60), Z_FAR + ctx.rng() * 300);
+      for (let i = 0; i < 12; i++) { const s = ctx.rng() < 0.5 ? -1 : 1; box(ctx, 6, 4 + ctx.rng() * 8, 6, ctx.rng() < 0.5 ? 0x7a6a55 : 0x8a8076, s * (60 + ctx.rng() * 80), 4, Z_FAR + ctx.rng() * 240); }
+      box(ctx, 14, 14, 14, 0xfff2a0, 70, 50, -270, 0, true);
+      addCloud(ctx, -50, 56, -220, 2); addCloud(ctx, 60, 60, -250, 1.6);
+    },
+  },
+  witcher: {
+    label: 'Northern Path',
+    bg: 0x2a2e34, fog: [0x2a2e34, 70, 250],
+    build(ctx) {
+      const { ROAD_HALF_W, Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0x5a6470, ground: 0x1a2018, hemi: 1.3, sun: 0xc8b88a, sunInt: 0.7, sunPos: [-40, 30, -70] });
+      addGround(ctx, 0x2a3322);
+      addRoad(ctx, { asphalt: 0x4a4438, dash: 0x9a9080, edge: 0x8a8070, median: null, rail: 0x3a3226 });
+      for (let i = 0; i < 50; i++) addPine(ctx, (ctx.rng() < 0.5 ? -1 : 1) * (ROAD_HALF_W + 5 + ctx.rng() * 70), Z_FAR + ctx.rng() * 290, 8 + ctx.rng() * 7, 0x1c2e1c);
+      for (let i = 0; i < 8; i++) addHouse(ctx, (ctx.rng() < 0.5 ? -1 : 1) * (ROAD_HALF_W + 10 + ctx.rng() * 30), Z_FAR + 20 + ctx.rng() * 180, ctx.rng());
+      addSkyDisc(ctx, { color: 0xe8e2cc, r: 12, x: -70, y: 50, z: -240, glowColor: 0xb8a878 });
+      addStars(ctx, { count: 300 });
+    },
+  },
+  halo: {
+    label: 'Halo Ring',
+    bg: 0x6a8aa8, fog: [0x6a8aa8, 130, 400],
+    build(ctx) {
+      const { Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0xcfe2f0, ground: 0x3a5a4a, hemi: 1.9, sun: 0xeaf2ff, sunInt: 1.0, sunPos: [40, 70, 10] });
+      addGround(ctx, 0x4a7a5a);
+      addRoad(ctx, { asphalt: 0x6a7280, dash: 0xc8d4e0, edge: 0xb0c0d0, median: 0x4a5666, rail: 0x5a6678 });
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(190, 12, 6, 50, Math.PI * 1.3), mat(0x9fb2c4));
+      ring.position.set(0, 40, -300); ring.rotation.set(0.35, 0, 0.15); ctx.g.add(ring);
+      const band = new THREE.Mesh(new THREE.TorusGeometry(190, 6, 6, 50, Math.PI * 1.3), mat(0x4a8a6a));
+      band.position.set(0, 40, -298); band.rotation.set(0.35, 0, 0.15); ctx.g.add(band);
+      for (let i = 0; i < 8; i++) { const s = ctx.rng() < 0.5 ? -1 : 1; box(ctx, 8, 10 + ctx.rng() * 14, 10, 0x8090a0, s * (55 + ctx.rng() * 70), 7, Z_FAR + ctx.rng() * 220); }
+      addCloud(ctx, -40, 60, -260, 2); addCloud(ctx, 50, 64, -230, 1.6);
+    },
+  },
+  fallout: {
+    label: 'Atomic Wastes',
+    bg: 0x9a9a5e, fog: [0x9a9a5e, 90, 300],
+    build(ctx) {
+      const { ROAD_HALF_W, Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0xc8c87a, ground: 0x5a5a32, hemi: 1.6, sun: 0xd8d88a, sunInt: 0.9, sunPos: [30, 50, -40] });
+      addGround(ctx, 0x7a7a48);
+      addRoad(ctx, { asphalt: 0x5a5a4a, dash: 0xa8a888, edge: 0x98987a, median: null, rail: 0x6a5a3a });
+      for (let i = 0; i < 12; i++) addMesa(ctx, (ctx.rng() < 0.5 ? -1 : 1) * (50 + ctx.rng() * 100), Z_FAR + ctx.rng() * 270, 0.8 + ctx.rng(), 0x8a7a48);
+      for (let i = 0; i < 14; i++) { const s = ctx.rng() < 0.5 ? -1 : 1; const h = 5 + ctx.rng() * 6; box(ctx, 0.4, h, 0.4, 0x3a2e22, s * (ROAD_HALF_W + 5 + ctx.rng() * 40), h / 2, Z_FAR + ctx.rng() * 290); }
+      addDome(ctx, -50, -120, 9, 0x4a5a4a); box(ctx, 0.3, 12, 0.3, 0x6a6a4a, -48, 6, -108);
+      addBillboard(ctx, ROAD_HALF_W + 8, -70, -0.4, 'NUKA', '#e8b84a', '#3a2a1a');
+      addBillboard(ctx, -(ROAD_HALF_W + 8), -140, 0.4, 'VAULT 76', '#7adf8a', '#1a2a1a');
+      addSkyDisc(ctx, { color: 0xd8d87a, r: 16, x: 40, y: 45, z: -270, glowColor: 0xb0b04a });
+    },
+  },
+  battlefield: {
+    label: 'Frontline',
+    bg: 0x4a3a2e, fog: [0x4a3a2e, 70, 240],
+    build(ctx) {
+      const { ROAD_HALF_W, Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0x8a6a4a, ground: 0x2a2018, hemi: 1.4, sun: 0xe8945e, sunInt: 1.0, sunPos: [-30, 30, -60] });
+      addGround(ctx, 0x4a3e2e);
+      addRoad(ctx, { asphalt: 0x3a352e, dash: 0x8a7a5a, edge: 0x7a6a4a, median: null, rail: 0x4a3a26 });
+      for (let i = 0; i < 18; i++) { const s = ctx.rng() < 0.5 ? -1 : 1; box(ctx, 2 + ctx.rng() * 3, 1 + ctx.rng() * 3, 2 + ctx.rng() * 3, 0x3a3228, s * (ROAD_HALF_W + 4 + ctx.rng() * 50), 1, Z_FAR + ctx.rng() * 290); }
+      for (let i = 0; i < 6; i++) { const s = ctx.rng() < 0.5 ? -1 : 1; box(ctx, 8, 10 + ctx.rng() * 12, 8, 0x4a4238, s * (55 + ctx.rng() * 60), 8, Z_FAR + ctx.rng() * 220); }
+      for (let i = 0; i < 6; i++) { const s = ctx.rng() < 0.5 ? -1 : 1; box(ctx, 1.5, 1.5, 1.5, 0xff6a2a, s * (ROAD_HALF_W + 8 + ctx.rng() * 40), 1, Z_FAR + ctx.rng() * 260, 0, true); }
+      addSkyDisc(ctx, { color: 0xe8945e, r: 14, x: -40, y: 30, z: -250, glowColor: 0xc85a2a });
+      return smokeAnimator(ctx, 280, 0x4a4038);
+    },
+  },
+  nightcity: {
+    label: 'Night City',
+    bg: 0x140a1e, fog: [0x140a1e, 90, 290],
+    build(ctx) {
+      addLights(ctx, { sky: 0xc8a83e, ground: 0x0e0818, hemi: 1.3, sun: 0xffd23e, sunInt: 0.6, sunPos: [0, 60, -40] });
+      addGround(ctx, 0x0e0a16);
+      addRoad(ctx, { asphalt: 0x18141e, dash: 0xffd23e, edge: 0xf03ea8, median: 0x241a2e, rail: 0x2a1f38 });
+      addLamps(ctx, { head: 0xffd23e, pool: 0x3a2a1e, poolOpacity: 0.35 });
+      addBoxCity(ctx, { count: 90, near: 22, spread: 60, color: 0x140e1e, hMin: 28, hMax: 78, litColor: 0xffd23e, litDensity: 0.8 });
+      addBoxCity(ctx, { count: 50, near: 70, spread: 90, color: 0x100a18, hMin: 34, hMax: 90, litColor: 0x35e0e8, litDensity: 0.7 });
+      addBillboard(ctx, -25, -90, 0.45, 'SAMURAI', '#ffd23e', '#1a0e22');
+      addBillboard(ctx, 26, -150, -0.45, '2·0·7·7', '#f03ea8', '#160a20');
+      addStars(ctx, { count: 200 });
+    },
+  },
+  crystal: {
+    label: 'Crystal Expanse',
+    bg: 0xc8d8f0, fog: [0xc8d8f0, 110, 360],
+    build(ctx) {
+      const { ROAD_HALF_W, Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0xeef2ff, ground: 0x8a9ac0, hemi: 2.0, sun: 0xffe8f4, sunInt: 1.0, sunPos: [30, 60, 20] });
+      addGround(ctx, 0xaeb8d8);
+      addRoad(ctx, { asphalt: 0x8a94b8, dash: 0xeaf0ff, edge: 0xd8e0f4, median: 0x9aa4c8, rail: 0xaab4d8 });
+      const cols = [0x9ad8e8, 0xe89ad8, 0xb0a0e8, 0xa0e8c0];
+      for (let i = 0; i < 26; i++) addCrystal(ctx, (ctx.rng() < 0.5 ? -1 : 1) * (ROAD_HALF_W + 6 + ctx.rng() * 60), Z_FAR + ctx.rng() * 290, 0.7 + ctx.rng() * 1.6, cols[Math.floor(ctx.rng() * cols.length)]);
+      for (let i = 0; i < 10; i++) { const c = new THREE.Mesh(new THREE.OctahedronGeometry(1.5 + ctx.rng() * 2), new THREE.MeshBasicMaterial({ color: cols[Math.floor(ctx.rng() * cols.length)], transparent: true, opacity: 0.6, fog: false })); c.position.set((ctx.rng() - 0.5) * 200, 25 + ctx.rng() * 40, Z_FAR + ctx.rng() * 240); ctx.g.add(c); }
+      addSkyDisc(ctx, { color: 0xffeef8, r: 14, x: 60, y: 60, z: -260, glowColor: 0xf0c8e8 });
+    },
+  },
+  velvet: {
+    label: 'Velvet Heist',
+    bg: 0x120308, fog: [0x120308, 90, 290],
+    build(ctx) {
+      const { ROAD_HALF_W, Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0xc8203a, ground: 0x0a0205, hemi: 1.3, sun: 0xff3a5a, sunInt: 0.7, sunPos: [-30, 50, -40] });
+      addGround(ctx, 0x0e0306);
+      addRoad(ctx, { asphalt: 0x1a0509, dash: 0xff2a4a, edge: 0xffffff, median: 0x2a0810, rail: 0x3a0a14 });
+      addBoxCity(ctx, { count: 70, near: 26, spread: 70, color: 0x180308, hMin: 18, hMax: 54, litColor: 0xff2a4a, litDensity: 0.7 });
+      addBillboard(ctx, -25, -90, 0.45, 'TAKE YOUR HEART', '#ff2a4a', '#0a0204');
+      addBillboard(ctx, 26, -150, -0.45, 'PHANTOM', '#ffffff', '#1a0308');
+      for (let i = 0; i < 14; i++) { const s = ctx.rng() < 0.5 ? -1 : 1; box(ctx, 0.3, 8 + ctx.rng() * 6, 0.3, 0xff2a4a, s * (ROAD_HALF_W + 2 + ctx.rng() * 4), 5, Z_FAR + ctx.rng() * 280, 0, true); }
+      addStars(ctx, { count: 150, color: 0xff6a7a });
+    },
+  },
+  mirrorsedge: {
+    label: 'Clean Rooftops',
+    bg: 0xeef4fb, fog: [0xeef4fb, 160, 460],
+    build(ctx) {
+      const { ROAD_HALF_W, Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0xffffff, ground: 0xc8d4e0, hemi: 2.6, sun: 0xffffff, sunInt: 0.9, sunPos: [40, 80, 30] });
+      addGround(ctx, 0xeef2f6);
+      addRoad(ctx, { asphalt: 0xf4f6f8, dash: 0xe04a4a, edge: 0xff3a3a, median: null, rail: 0xd8dee4 });
+      addBoxCity(ctx, { count: 60, near: 26, spread: 70, color: 0xf2f4f6, hMin: 16, hMax: 48, litColor: 0xff3a3a, litDensity: 0.25, edgeGlow: 0xff3a3a });
+      addBoxCity(ctx, { count: 40, near: 70, spread: 80, color: 0xe8edf2, hMin: 22, hMax: 60 });
+      for (let i = 0; i < 6; i++) { const s = ctx.rng() < 0.5 ? -1 : 1; box(ctx, 5, 0.4, 5, 0xff3a3a, s * (ROAD_HALF_W + 10 + ctx.rng() * 30), 0.3, Z_FAR + 40 + ctx.rng() * 200, 0, true); }
+    },
+  },
+  deusex: {
+    label: 'Black & Gold',
+    bg: 0x0e0c08, fog: [0x0e0c08, 90, 300],
+    build(ctx) {
+      const { ROAD_HALF_W, Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0xd9a521, ground: 0x0a0805, hemi: 1.2, sun: 0xf0c24a, sunInt: 0.7, sunPos: [-30, 50, -40] });
+      addGround(ctx, 0x0c0a06);
+      addRoad(ctx, { asphalt: 0x14110a, dash: 0xd9a521, edge: 0xb08818, median: 0x1a160c, rail: 0x241d10 });
+      for (let i = 0; i < 18; i++) addHexPillar(ctx, (ctx.rng() < 0.5 ? -1 : 1) * (ROAD_HALF_W + 5 + ctx.rng() * 40), Z_FAR + ctx.rng() * 290, 7 + ctx.rng() * 8);
+      addBoxCity(ctx, { count: 40, near: 60, spread: 70, color: 0x141008, hMin: 16, hMax: 48, litColor: 0xd9a521, litDensity: 0.5, edgeGlow: 0xd9a521 });
+      addBillboard(ctx, -25, -110, 0.45, 'AUGMENTED', '#d9a521', '#0a0804');
+      addStars(ctx, { count: 120, color: 0xe8c86a });
+    },
+  },
+  mario: {
+    label: 'Power-Up Speedway',
+    bg: 0x6ec0ff, fog: [0x6ec0ff, 160, 460],
+    build(ctx) {
+      const { ROAD_HALF_W, Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0xeaf6ff, ground: 0x6abf4a, hemi: 2.3, sun: 0xfff6c0, sunInt: 1.2, sunPos: [60, 70, 30] });
+      addGround(ctx, 0x5ab83a);
+      addRoad(ctx, { asphalt: 0x8a7a5a, dash: 0xfff0c0, edge: 0xe8d8a0, median: null, rail: 0xc83a3a });
+      for (let i = 0; i < 14; i++) addPipe(ctx, (ctx.rng() < 0.5 ? -1 : 1) * (ROAD_HALF_W + 5 + ctx.rng() * 40), Z_FAR + ctx.rng() * 290);
+      for (let i = 0; i < 10; i++) box(ctx, 2, 2, 2, 0xe8a83a, (ctx.rng() - 0.5) * 120, 8 + ctx.rng() * 10, Z_FAR + ctx.rng() * 240, 0, true);
+      for (let i = 0; i < 8; i++) { const s = ctx.rng() < 0.5 ? -1 : 1; const h = 6 + ctx.rng() * 8; const hill = new THREE.Mesh(new THREE.SphereGeometry(h, 10, 8), mat(0x4aa82a)); hill.scale.y = 0.5; hill.position.set(s * (50 + ctx.rng() * 70), 0, Z_FAR + ctx.rng() * 240); ctx.g.add(hill); }
+      addCloud(ctx, -50, 50, -220, 2); addCloud(ctx, 60, 56, -250, 1.8); addCloud(ctx, 10, 52, -180, 1.4);
+    },
+  },
+
+  // ===== Sci-fi / racing & tactical =====
+  antigrav: {
+    label: 'Anti-Grav Circuit',
+    fleet: 'spacecraft',
+    bg: 0x05060f, fog: [0x05060f, 110, 400],
+    build(ctx) {
+      const { Z_NEAR, Z_FAR, ROAD_HALF_W } = ctx.C;
+      addLights(ctx, { sky: 0x2a3a6e, ground: 0x05060f, hemi: 1.2, sun: 0x6a8aff, sunInt: 0.5, sunPos: [0, 70, 30] });
+      const L = Z_NEAR - Z_FAR + 30;
+      box(ctx, ROAD_HALF_W * 2 + 3, 1.6, L, 0x0a0e1c, 0, -0.8, (Z_NEAR + Z_FAR) / 2);
+      addRoad(ctx, { asphalt: 0x0c1024, dash: 0x18e0ff, edge: 0xff6a2a, median: null, rail: null, dashLen: 6, dashEvery: 8 });
+      for (const side of [-1, 1]) box(ctx, 0.3, 0.3, L, 0x18e0ff, side * (ROAD_HALF_W + 1), 0.4, (Z_NEAR + Z_FAR) / 2, 0, true);
+      [-30, -90, -150, -210].forEach((z, i) => addNeonArch(ctx, z, i % 2 ? 0xff6a2a : 0x18e0ff));
+      addBoxCity(ctx, { count: 30, near: 60, spread: 90, color: 0x0a1020, hMin: 14, hMax: 50, edgeGlow: 0x18e0ff });
+      addStars(ctx, { count: 400, color: 0x8ad8ff });
+    },
+  },
+  trench: {
+    label: 'The Trench',
+    fleet: 'spacecraft',
+    bg: 0x10141a, fog: [0x10141a, 80, 300],
+    build(ctx) {
+      addLights(ctx, { sky: 0x6a7886, ground: 0x10141a, hemi: 1.5, sun: 0xc8d4e0, sunInt: 0.8, sunPos: [0, 60, 40] });
+      addGround(ctx, 0x1a1f26);
+      addRoad(ctx, { asphalt: 0x22272e, dash: 0x8a96a4, edge: 0x6a7684, median: null, rail: null, dashLen: 4, dashEvery: 10 });
+      addTrenchWall(ctx, -1, 0x2e353e);
+      addTrenchWall(ctx, 1, 0x2e353e);
+      box(ctx, 3, 3, 3, 0xffd24a, 0, 8, -210, 0, true);
+      addStars(ctx, { count: 300 });
+    },
+  },
+  tron: {
+    label: 'Neon Freeway',
+    bg: 0x02030a, fog: [0x02030a, 130, 440],
+    build(ctx) {
+      addLights(ctx, { sky: 0x10406a, ground: 0x02030a, hemi: 1.2, sun: 0x18e0ff, sunInt: 0.4, sunPos: [0, 70, 30] });
+      addGrid(ctx, { color: 0x0e6a8a });
+      addRoad(ctx, { asphalt: 0x03060e, dash: 0x18e0ff, edge: 0x18e0ff, median: 0x081822, rail: null, dashLen: 6, dashEvery: 9 });
+      [-40, -110, -180].forEach((z) => addNeonArch(ctx, z, 0x18e0ff));
+      addBoxCity(ctx, { count: 40, near: 50, spread: 90, color: 0x041018, hMin: 14, hMax: 56, edgeGlow: 0x18e0ff });
+      addStars(ctx, { count: 250, color: 0x6ee8ff });
+    },
+  },
+  radar: {
+    label: 'Tactical Radar',
+    bg: 0x021207, fog: [0x021207, 120, 380],
+    build(ctx) {
+      const { ROAD_HALF_W, Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0x1a5a2a, ground: 0x021207, hemi: 1.3, sun: 0x4aff7a, sunInt: 0.4, sunPos: [0, 80, 0] });
+      addRadarGround(ctx, 0x35e06a);
+      addRoad(ctx, { asphalt: 0x06200e, dash: 0x35e06a, edge: 0x35e06a, median: null, rail: null, dashLen: 3, dashEvery: 10 });
+      for (let i = 0; i < 10; i++) { const s = ctx.rng() < 0.5 ? -1 : 1; box(ctx, 3, 2, 3, 0x1a3a22, s * (ROAD_HALF_W + 6 + ctx.rng() * 40), 1, Z_FAR + ctx.rng() * 260); }
+      addStars(ctx, { count: 150, color: 0x6affa0 });
+    },
+  },
+  citymap: {
+    label: 'City Traffic Map',
+    bg: 0x1a2230, fog: [0x1a2230, 150, 460],
+    build(ctx) {
+      const { ROAD_HALF_W, Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0xdde6f0, ground: 0x2a3340, hemi: 2.2, sun: 0xffffff, sunInt: 0.7, sunPos: [30, 90, 20] });
+      addGround(ctx, 0x222b38);
+      addRoad(ctx, { asphalt: 0x39424f, dash: 0xf0d24a, edge: 0xe8eef4, median: 0x4a5460, rail: 0x303a46 });
+      const cols = [0x4a9ed8, 0x4ad88a, 0xe85a5a, 0xe8b84a, 0x9a6ad8];
+      for (let i = 0; i < 50; i++) { const s = ctx.rng() < 0.5 ? -1 : 1; const w = 4 + ctx.rng() * 6; box(ctx, w, 3 + ctx.rng() * 6, w, cols[Math.floor(ctx.rng() * cols.length)], s * (ROAD_HALF_W + 6 + ctx.rng() * 80), 2, Z_FAR + ctx.rng() * 300); }
+      for (let z = Z_FAR; z < 60; z += 40) box(ctx, 200, 0.05, 2, 0x4a5460, 0, 0.03, z);
+    },
+  },
+  motorways: {
+    label: 'Motorways',
+    bg: 0xeae4d8, fog: [0xeae4d8, 170, 480],
+    build(ctx) {
+      const { ROAD_HALF_W, Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0xfbf7ee, ground: 0xd8d0c0, hemi: 2.6, sun: 0xffffff, sunInt: 0.6, sunPos: [30, 90, 30] });
+      addGround(ctx, 0xe4ddcf);
+      addRoad(ctx, { asphalt: 0xcfc7b6, dash: 0xfbf7ee, edge: 0xb8b0a0, median: null, rail: null, dashLen: 3, dashEvery: 12 });
+      const cols = [0xe85a5a, 0x4a9ed8, 0x4ad88a, 0xe8b84a, 0x9a6ad8];
+      for (let i = 0; i < 22; i++) { const s = ctx.rng() < 0.5 ? -1 : 1; const c = cols[Math.floor(ctx.rng() * cols.length)]; const x = s * (ROAD_HALF_W + 8 + ctx.rng() * 50), z = Z_FAR + ctx.rng() * 290; box(ctx, 2.4, 2.4, 2.4, c, x, 1.4, z); const disc = new THREE.Mesh(new THREE.CircleGeometry(4, 20), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.18 })); disc.rotation.x = -Math.PI / 2; disc.position.set(x, 0.03, z); ctx.g.add(disc); }
+    },
+  },
+  observatory: {
+    label: 'Packet Observatory',
+    bg: 0x04060c, fog: [0x04060c, 90, 300],
+    build(ctx) {
+      const { ROAD_HALF_W } = ctx.C;
+      addLights(ctx, { sky: 0x1a3a5a, ground: 0x04060c, hemi: 1.2, sun: 0x35d2e8, sunInt: 0.5, sunPos: [0, 70, 30] });
+      addGround(ctx, 0x05080f);
+      addRoad(ctx, { asphalt: 0x0a1018, dash: 0x35d2e8, edge: 0x35d2e8, median: 0x0e1822, rail: 0x122430 });
+      addGrid(ctx, { color: 0x0e4a5a, div: 80 });
+      addBillboard(ctx, -(ROAD_HALF_W + 7), -50, 0.4, 'TCP 443', '#35d2e8', '#04080e');
+      addBillboard(ctx, ROAD_HALF_W + 7, -100, -0.4, 'INGRESS', '#7adf8a', '#04080e');
+      addBillboard(ctx, -(ROAD_HALF_W + 7), -160, 0.4, 'ALERT', '#ff5a5a', '#0e0406');
+      addBoxCity(ctx, { count: 30, near: 60, spread: 80, color: 0x081018, hMin: 14, hMax: 50, edgeGlow: 0x35d2e8 });
+      addStars(ctx, { count: 200, color: 0x6ae8ff });
+    },
+  },
+
+  // ===== Indie art styles =====
+  limbo: {
+    label: 'Limbo',
+    bg: 0x6e7378, fog: [0x6e7378, 50, 200],
+    build(ctx) {
+      const { ROAD_HALF_W, Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0x9a9ea2, ground: 0x1a1c1e, hemi: 1.8, sun: 0xc8ccd0, sunInt: 0.5, sunPos: [0, 60, -40] });
+      addGround(ctx, 0x14161a);
+      addRoad(ctx, { asphalt: 0x1a1c20, dash: 0x3a3e44, edge: 0x4a4e54, median: null, rail: 0x000000 });
+      for (let i = 0; i < 40; i++) addSilhouetteTree(ctx, (ctx.rng() < 0.5 ? -1 : 1) * (ROAD_HALF_W + 5 + ctx.rng() * 60), Z_FAR + ctx.rng() * 300, 8 + ctx.rng() * 8);
+      for (let i = 0; i < 10; i++) { const s = ctx.rng() < 0.5 ? -1 : 1; box(ctx, 6, 10 + ctx.rng() * 16, 6, 0x000000, s * (50 + ctx.rng() * 60), 8, Z_FAR + ctx.rng() * 240); }
+      addSkyDisc(ctx, { color: 0xb8bcc0, r: 18, x: 0, y: 40, z: -290 });
+    },
+  },
+  cuphead: {
+    label: 'Rubber Hose',
+    bg: 0xe8d8b0, fog: [0xe8d8b0, 120, 380],
+    build(ctx) {
+      const { ROAD_HALF_W, Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0xfaf0d8, ground: 0xb8a878, hemi: 2.2, sun: 0xfff0c8, sunInt: 1.0, sunPos: [30, 60, 20] });
+      addGround(ctx, 0xc8b888);
+      addRoad(ctx, { asphalt: 0x6a5a44, dash: 0xe8dcc0, edge: 0x3a2e20, median: null, rail: 0x3a2e20 });
+      for (let i = 0; i < 36; i++) addInkTree(ctx, (ctx.rng() < 0.5 ? -1 : 1) * (ROAD_HALF_W + 6 + ctx.rng() * 60), Z_FAR + ctx.rng() * 300);
+      for (let i = 0; i < 8; i++) addMesa(ctx, (ctx.rng() < 0.5 ? -1 : 1) * (55 + ctx.rng() * 70), Z_FAR + ctx.rng() * 240, 0.7 + ctx.rng(), 0x8a6a4a);
+      addSkyDisc(ctx, { color: 0xf0d89a, r: 16, x: 50, y: 55, z: -260, glowColor: 0xe0b86a });
+      addCloud(ctx, -50, 55, -220, 1.8, 0xfdf4e0); addCloud(ctx, 60, 60, -250, 1.5, 0xfdf4e0);
+    },
+  },
+  okami: {
+    label: 'Ink Wash',
+    bg: 0xefe6d2, fog: [0xefe6d2, 130, 400],
+    build(ctx) {
+      const { ROAD_HALF_W, Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0xfbf6ea, ground: 0xc8bca0, hemi: 2.3, sun: 0xfff0e0, sunInt: 0.9, sunPos: [-30, 60, -30] });
+      addGround(ctx, 0xe4dcc8);
+      addRoad(ctx, { asphalt: 0x8a8472, dash: 0xefe8d8, edge: 0x2a2418, median: null, rail: 0x2a2418 });
+      for (let i = 0; i < 30; i++) addInkTree(ctx, (ctx.rng() < 0.5 ? -1 : 1) * (ROAD_HALF_W + 6 + ctx.rng() * 60), Z_FAR + ctx.rng() * 300);
+      for (let i = 0; i < 8; i++) addMesa(ctx, (ctx.rng() < 0.5 ? -1 : 1) * (55 + ctx.rng() * 80), Z_FAR + ctx.rng() * 250, 0.8 + ctx.rng(), 0x6a6250);
+      addSkyDisc(ctx, { color: 0xd84a3a, r: 13, x: -70, y: 48, z: -250, glowColor: 0xe87a5a });
+    },
+  },
+  journey: {
+    label: 'Dunes',
+    bg: 0xe8a85e, fog: [0xe8a85e, 120, 400],
+    build(ctx) {
+      const { Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0xffd9a0, ground: 0xc88a3a, hemi: 2.0, sun: 0xffe6b0, sunInt: 1.2, sunPos: [-40, 30, -80] });
+      addGround(ctx, 0xe0a64e);
+      addRoad(ctx, { asphalt: 0xc89a5a, dash: 0xf0d8a8, edge: 0xd8b878, median: null, rail: null, dashLen: 2, dashEvery: 14 });
+      for (let i = 0; i < 22; i++) addDune(ctx, (ctx.rng() < 0.5 ? -1 : 1) * (40 + ctx.rng() * 120), Z_FAR + ctx.rng() * 290, 0.7 + ctx.rng() * 1.5, 0xd89a4a);
+      addSkyDisc(ctx, { color: 0xfff0c8, r: 20, x: -60, y: 30, z: -280, glowColor: 0xffc878 });
+    },
+  },
+  windwaker: {
+    label: 'Toon Sea',
+    fleet: 'boats',
+    bg: 0x6ec8e8, fog: [0x6ec8e8, 140, 440],
+    build(ctx) {
+      const { Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0xeaf8ff, ground: 0x2a8ab0, hemi: 2.3, sun: 0xfff6d0, sunInt: 1.2, sunPos: [50, 70, 20] });
+      addGround(ctx, 0x2a9ec0);
+      addRoad(ctx, { asphalt: 0x2e9ec8, dash: 0xeafaff, edge: 0xbfe8f4, median: null, rail: null, dashLen: 1.4, dashEvery: 14 });
+      for (let i = 0; i < 10; i++) { const s = ctx.rng() < 0.5 ? -1 : 1; const h = 6 + ctx.rng() * 8; const x = s * (50 + ctx.rng() * 70), z = Z_FAR + ctx.rng() * 240; const isl = new THREE.Mesh(new THREE.ConeGeometry(10 + ctx.rng() * 8, h, 8), mat(0x4ab85a)); isl.position.set(x, h / 2 - 1, z); ctx.g.add(isl); box(ctx, 14, 2, 14, 0xe8d8a0, x, 0.5, z); }
+      addSkyDisc(ctx, { color: 0xfff6d0, r: 14, x: 70, y: 60, z: -260, glowColor: 0xffe6a0 });
+      addCloud(ctx, -50, 56, -220, 2.4); addCloud(ctx, 60, 60, -250, 2);
+    },
+  },
+  borderlands: {
+    label: 'Cel Wastes',
+    bg: 0xc88a4a, fog: [0xc88a4a, 90, 300],
+    build(ctx) {
+      const { ROAD_HALF_W, Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0xffc87a, ground: 0x6a4a28, hemi: 1.8, sun: 0xffb060, sunInt: 1.2, sunPos: [20, 50, -40] });
+      addGround(ctx, 0xb87a3a);
+      addRoad(ctx, { asphalt: 0x5a4632, dash: 0xf0c060, edge: 0x1a1208, median: null, rail: 0x1a1208 });
+      for (let i = 0; i < 14; i++) addMesa(ctx, (ctx.rng() < 0.5 ? -1 : 1) * (45 + ctx.rng() * 110), Z_FAR + ctx.rng() * 280, 0.9 + ctx.rng() * 1.2, 0x9a5a2a);
+      for (let i = 0; i < 12; i++) { const s = ctx.rng() < 0.5 ? -1 : 1; box(ctx, 4, 4 + ctx.rng() * 5, 4, 0x4a3a28, s * (ROAD_HALF_W + 6 + ctx.rng() * 40), 3, Z_FAR + ctx.rng() * 260); }
+      addSkyDisc(ctx, { color: 0xffe0a0, r: 16, x: 30, y: 50, z: -270, glowColor: 0xffae5a });
+    },
+  },
+  monument: {
+    label: 'Monument',
+    bg: 0xf0d8e0, fog: [0xf0d8e0, 140, 440],
+    build(ctx) {
+      const { ROAD_HALF_W, Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0xfbeef2, ground: 0xc8a8c0, hemi: 2.4, sun: 0xfff0f6, sunInt: 0.8, sunPos: [30, 80, 20] });
+      addGround(ctx, 0xd8b8d0);
+      addRoad(ctx, { asphalt: 0xc89ac0, dash: 0xf6e6f0, edge: 0xe0c0d8, median: null, rail: null, dashLen: 3, dashEvery: 12 });
+      const cols = [0xe89ab0, 0x9ab8e8, 0xe8c89a, 0xa0e0c0, 0xc0a0e8];
+      for (let i = 0; i < 16; i++) addMonument(ctx, (ctx.rng() < 0.5 ? -1 : 1) * (ROAD_HALF_W + 10 + ctx.rng() * 60), Z_FAR + 10 + ctx.rng() * 280, cols[Math.floor(ctx.rng() * cols.length)]);
+      addSkyDisc(ctx, { color: 0xfff0f6, r: 12, x: 70, y: 65, z: -260, glowColor: 0xf0c8e0 });
+    },
+  },
+  hallownest: {
+    label: 'Hallownest',
+    bg: 0x06101a, fog: [0x06101a, 60, 220],
+    build(ctx) {
+      const { ROAD_HALF_W, Z_FAR } = ctx.C;
+      addLights(ctx, { sky: 0x1a4a6a, ground: 0x040a12, hemi: 1.3, sun: 0x4ad8e8, sunInt: 0.5, sunPos: [0, 60, -30] });
+      addGround(ctx, 0x06101a);
+      addRoad(ctx, { asphalt: 0x0e1a26, dash: 0x4ad8e8, edge: 0x2a5a6a, median: null, rail: 0x16303e });
+      for (let i = 0; i < 16; i++) addGothicTower(ctx, (ctx.rng() < 0.5 ? -1 : 1) * (30 + ctx.rng() * 80), Z_FAR + ctx.rng() * 260, 20 + ctx.rng() * 30);
+      makeParticles(ctx, { count: 400, color: 0x6ae8f0, size: 0.6, area: [240, 40, 320], opacity: 0.7 });
+      for (let i = 0; i < 6; i++) { const s = ctx.rng() < 0.5 ? -1 : 1; const pool = new THREE.Mesh(new THREE.CircleGeometry(5 + ctx.rng() * 4, 14), new THREE.MeshBasicMaterial({ color: 0x2a8a9a, transparent: true, opacity: 0.4 })); pool.rotation.x = -Math.PI / 2; pool.position.set(s * (ROAD_HALF_W + 10 + ctx.rng() * 40), 0.02, Z_FAR + ctx.rng() * 260); ctx.g.add(pool); }
+      addStars(ctx, { count: 200, color: 0x6ae8f0 });
     },
   },
 };

@@ -75,7 +75,7 @@ connected browsers over WebSocket. Also serves the static front end over HTTP.
 | `main.js` | scene/render loop, vehicle lifecycle, picking, filters, HUD, sparkline, audio, theme/fleet switching |
 | `vehicles.js` | the default **car** fleet (9 protocol-mapped models) + `InstancedMesh` builder |
 | `fleets.js` | 11 additional fleets (boats, spacecraft, fish, aircraft, trains, animals, dinosaurs, …) sharing the same 9 slots |
-| `themes.js` | 26 scene environments (lighting, fog, sky, props) with shared procedural builders |
+| `themes.js` | 52 scene environments (lighting, fog, sky, props) with shared procedural builders |
 | `geoip.json` | offline prefix → org/country table for exit signs |
 | `index.html` | DOM scaffold, HUD, controls, Three.js import map |
 
@@ -433,7 +433,7 @@ Signalro/
 │   ├── main.js            # render loop, vehicles, picking, filters, HUD, themes
 │   ├── vehicles.js        # default car fleet + InstancedMesh builder
 │   ├── fleets.js          # 11 additional fleets (boats, fish, dinos, …)
-│   ├── themes.js          # 26 scene environments
+│   ├── themes.js          # 52 scene environments
 │   └── geoip.json         # offline org/country prefix table
 ├── docs/
 │   ├── index.html         # this documentation as a website
